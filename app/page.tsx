@@ -123,7 +123,7 @@ export default async function Home() {
     paddingLeft: '0.35rem'
   }}
 >
-  Studio
+  Studio test 123
 </p>
             </div>
 
