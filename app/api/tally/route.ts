@@ -9,7 +9,10 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    console.log('Tally payload:', body)
+    console.log(
+      'FIELDS:',
+      JSON.stringify(body.data.fields, null, 2)
+    )
 
     return Response.json({
       success: true,
