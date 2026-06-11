@@ -23,6 +23,18 @@ function getDropdownText(field: any) {
   return option?.text ?? null
 }
 
+function getMultiSelectTexts(field: any) {
+  if (!field || !field.value || !field.options) {
+    return []
+  }
+
+  return field.options
+    .filter((option: any) =>
+      field.value.includes(option.id)
+    )
+    .map((option: any) => option.text)
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -58,7 +70,11 @@ export async function POST(req: Request) {
     const horaEntrega =
       getField(fields, 'Hora')?.value ?? null
 
-    const { error } = await supabase
+    const kitsSeleccionados = getMultiSelectTexts(
+      getField(fields, '¿Cuál es tu kit?')
+    )
+
+    const { data: pedidoCreado, error } = await supabase
       .from('pedidos')
       .insert({
         tally_submission_id: submissionId,
@@ -72,6 +88,8 @@ export async function POST(req: Request) {
         hora_entrega: horaEntrega,
         estatus: 'Pendiente'
       })
+      .select()
+      .single()
 
     if (error) {
       console.error('SUPABASE ERROR:', error)
@@ -80,6 +98,38 @@ export async function POST(req: Request) {
         { error: error.message },
         { status: 500 }
       )
+    }
+
+    const pedidoId = pedidoCreado.id
+
+    for (const nombreKit of kitsSeleccionados) {
+      const { data: kit, error: kitError } = await supabase
+        .from('kits')
+        .select('id')
+        .eq('nombre', nombreKit)
+        .single()
+
+      if (kitError || !kit) {
+        console.error(
+          `No se encontró kit: ${nombreKit}`
+        )
+        continue
+      }
+
+      const { error: pedidoKitError } = await supabase
+        .from('pedido_kits')
+        .insert({
+          pedido_id: pedidoId,
+          kit_id: kit.id,
+          cantidad: 1
+        })
+
+      if (pedidoKitError) {
+        console.error(
+          'Error insertando pedido_kits:',
+          pedidoKitError
+        )
+      }
     }
 
     return Response.json({
