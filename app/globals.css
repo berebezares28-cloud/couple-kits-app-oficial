@@ -3,25 +3,71 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --primary: #c6302c;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: white;
+  color: black;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  font-family: Inter, sans-serif;
+}
+
+.editorial-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.editorial-subtitle {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.section-title {
+  font-size: 1.75rem;
+  font-weight: 900;
+  margin-bottom: 1rem;
+}
+
+.editorial-card {
+  background: white;
+  border: 2px solid black;
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #666;
+}
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  margin-top: 0.5rem;
+}
+
+.customer-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.customer-instagram {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.kit-name {
+  color: #c6302c;
+  font-weight: 700;
 }

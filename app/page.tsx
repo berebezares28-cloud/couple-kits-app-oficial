@@ -1,125 +1,271 @@
+import Image from 'next/image'
 import { supabase } from '../scr/lib/supabase'
 
+function getStatusStyle(status: string) {
+  switch (status) {
+    case 'Pendiente':
+      return {
+        background: '#FFF7E6',
+        color: '#D48806',
+        border: '#FFE58F'
+      }
+
+    case 'Entregado':
+      return {
+        background: '#F6FFED',
+        color: '#389E0D',
+        border: '#B7EB8F'
+      }
+
+    case 'Cancelado':
+      return {
+        background: '#FFF1F0',
+        color: '#CF1322',
+        border: '#FFA39E'
+      }
+
+    default:
+      return {
+        background: '#F5F5F5',
+        color: '#595959',
+        border: '#D9D9D9'
+      }
+  }
+}
+
 export default async function Home() {
-  // Pedidos pendientes
   const { count: pedidosPendientes } = await supabase
     .from('pedidos')
     .select('*', { count: 'exact', head: true })
     .eq('estatus', 'Pendiente')
 
-  // Kits activos
   const { count: kitsActivos } = await supabase
     .from('kits')
     .select('*', { count: 'exact', head: true })
     .eq('activo', true)
 
-  // Insumos registrados
   const { count: insumosRegistrados } = await supabase
     .from('insumos')
     .select('*', { count: 'exact', head: true })
 
-  // Insumos críticos
   const { data: insumosCriticosData } = await supabase
     .from('insumos')
     .select('stock_actual, stock_minimo')
 
   const insumosCriticos =
     insumosCriticosData?.filter(
-      (i) => Number(i.stock_actual) <= Number(i.stock_minimo)
+      (i) =>
+        Number(i.stock_actual) <=
+        Number(i.stock_minimo)
     ).length ?? 0
 
-  // Próximas entregas
-  const { data: proximasEntregas } = await supabase
+  const { data: pedidos } = await supabase
     .from('pedidos')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const pedidoIds =
+    pedidos?.map((p) => p.id) ?? []
+
+  const { data: pedidoKits } = await supabase
+    .from('pedido_kits')
     .select(`
-      nombre,
-      fecha_entrega,
-      lugar_entrega,
-      kits(nombre)
+      pedido_id,
+      kits (
+        nombre
+      )
     `)
-    .order('fecha_entrega', { ascending: true })
-    .limit(5)
+    .in('pedido_id', pedidoIds)
 
   return (
-    <main className="min-h-screen bg-[#F9F6F2] p-6">
-      <div className="max-w-md mx-auto">
+    <main className="min-h-screen bg-white">
+      <div className="max-w-md mx-auto px-5 pb-20">
 
-        <h1 className="text-3xl font-bold mb-2">
-          Hola Bere 👋
-        </h1>
+        {/* HEADER */}
 
-        <p className="text-gray-500 mb-6">
-          Así va Couple Kits hoy
-        </p>
+        <div className="pt-8 pb-10">
+          <div className="flex items-center gap-4">
+
+            <Image
+              src="/images/logo.png"
+              alt="Couple Kits"
+              width={70}
+              height={70}
+              priority
+              className="shrink-0"
+            />
+
+            <div>
+            <h1
+  className="editorial-title"
+  style={{
+    color: '#c6302c',
+    margin: 0,
+    fontSize: '3rem',
+    lineHeight: '0.95'
+  }}
+>
+  Couple Kits
+</h1>
+
+<p
+  className="mt-1"
+  style={{
+    fontSize: '0.7rem',
+    letterSpacing: '0.35em',
+    textTransform: 'uppercase',
+    color: '#888',
+    paddingLeft: '0.35rem'
+  }}
+>
+  Studio
+</p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* MÉTRICAS */}
 
         <div className="grid grid-cols-2 gap-4">
 
-          <div className="bg-[#F8D7DA] rounded-3xl p-5">
-            <p className="text-sm text-gray-600">
-              Pedidos pendientes
+          <div className="editorial-card">
+            <p className="metric-label">
+              📦 Pedidos pendientes
             </p>
-            <h2 className="text-2xl font-bold mt-2">
+
+            <h2
+              className="metric-value"
+              style={{ color: '#c6302c' }}
+            >
               {pedidosPendientes ?? 0}
             </h2>
           </div>
 
-          <div className="bg-[#DDE5B6] rounded-3xl p-5">
-            <p className="text-sm text-gray-600">
-              Kits activos
+          <div className="editorial-card">
+            <p className="metric-label">
+              🎨 Kits activos
             </p>
-            <h2 className="text-2xl font-bold mt-2">
+
+            <h2 className="metric-value">
               {kitsActivos ?? 0}
             </h2>
           </div>
 
-          <div className="bg-[#E8DFF5] rounded-3xl p-5">
-            <p className="text-sm text-gray-600">
-              Insumos
+          <div className="editorial-card">
+            <p className="metric-label">
+              📚 Insumos registrados
             </p>
-            <h2 className="text-2xl font-bold mt-2">
+
+            <h2 className="metric-value">
               {insumosRegistrados ?? 0}
             </h2>
           </div>
 
-          <div className="bg-[#D8F3DC] rounded-3xl p-5">
-            <p className="text-sm text-gray-600">
-              Insumos críticos
+          <div className="editorial-card">
+            <p className="metric-label">
+              ⚠️ Insumos críticos
             </p>
-            <h2 className="text-2xl font-bold mt-2">
+
+            <h2 className="metric-value">
               {insumosCriticos}
             </h2>
           </div>
 
         </div>
 
-        <div className="mt-8">
+        {/* PEDIDOS */}
 
-          <h2 className="text-xl font-semibold mb-4">
-            Próximas entregas
+        <div className="mt-12">
+
+          <h2 className="section-title">
+            PEDIDOS RECIENTES
           </h2>
 
-          {proximasEntregas?.length ? (
-            proximasEntregas.map((pedido: any, index: number) => (
-              <div
-                key={index}
-                className="bg-white rounded-3xl p-4 mb-3"
-              >
-                <p className="font-semibold">
-                  {pedido.nombre}
-                </p>
+          {pedidos?.length ? (
+            pedidos.map((pedido: any) => {
 
-                <p className="text-gray-500 text-sm">
-                  {pedido.fecha_entrega}
-                </p>
+              const kitsDelPedido =
+                pedidoKits
+                  ?.filter(
+                    (pk: any) =>
+                      pk.pedido_id === pedido.id
+                  )
+                  .map(
+                    (pk: any) =>
+                      (pk.kits as any)?.nombre
+                  )
+                  .filter(Boolean)
+                  .join(', ') ?? ''
 
-                <p className="text-gray-500 text-sm">
-                  📍 {pedido.lugar_entrega}
-                </p>
-              </div>
-            ))
+              const statusStyle =
+                getStatusStyle(
+                  pedido.estatus
+                )
+
+              return (
+                <div
+                  key={pedido.id}
+                  className="editorial-card mb-4"
+                >
+
+                  <div className="flex justify-between items-start">
+
+                    <div>
+                      <p className="customer-name">
+                        {pedido.nombre}
+                      </p>
+
+                      <p className="customer-instagram">
+                        @{pedido.instagram}
+                      </p>
+                    </div>
+
+                    <span
+                      className="px-3 py-1 text-xs rounded-full border"
+                      style={{
+                        background:
+                          statusStyle.background,
+                        color:
+                          statusStyle.color,
+                        borderColor:
+                          statusStyle.border
+                      }}
+                    >
+                      {pedido.estatus}
+                    </span>
+
+                  </div>
+
+                  <div className="mt-4">
+                    <p className="kit-name">
+                      🎨 {kitsDelPedido || 'Sin kits'}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 space-y-1 text-sm text-gray-600">
+
+                    <p>
+                      📅 {pedido.fecha_entrega}
+                    </p>
+
+                    <p>
+                      ⏰ {pedido.hora_entrega}
+                    </p>
+
+                    <p>
+                      📍 {pedido.lugar_entrega}
+                    </p>
+
+                  </div>
+
+                </div>
+              )
+            })
           ) : (
-            <div className="bg-white rounded-3xl p-4">
-              No hay entregas programadas
+            <div className="editorial-card">
+              No hay pedidos todavía
             </div>
           )}
 
