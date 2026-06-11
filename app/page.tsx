@@ -38,6 +38,10 @@ export default async function Home() {
     .from('pedidos')
     .select('*', { count: 'exact', head: true })
     .eq('estatus', 'Pendiente')
+    console.log(
+      'PEDIDOS PENDIENTES:',
+      pedidosPendientes
+    )
 
   const { count: kitsActivos } = await supabase
     .from('kits')
