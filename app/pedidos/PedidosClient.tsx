@@ -22,7 +22,7 @@ background: '#FFF7E6',
 color: '#D48806'
 }
 
-```
+
 case 'Entregado':
   return {
     background: '#F6FFED',
@@ -40,7 +40,7 @@ default:
     background: '#F5F5F5',
     color: '#595959'
   }
-```
+
 
 }
 }
@@ -63,7 +63,7 @@ const pedidosFiltrados = useMemo(() => {
 const q =
 busqueda.toLowerCase()
 
-```
+
 return pedidos.filter((pedido) => {
   const kits =
     pedido.kits.join(' ')
@@ -92,13 +92,9 @@ return pedidos.filter((pedido) => {
     coincideFiltro
   )
 })
-```
 
-}, [
-busqueda,
-pedidos,
-filtro
-])
+
+}, [busqueda, filtro, pedidos])
 
 async function actualizarEstatus(
 pedidoId: string,
@@ -118,7 +114,7 @@ estatus: nuevoEstatus
 }
 )
 
-```
+
 if (!response.ok) {
   alert(
     'Error actualizando pedido'
@@ -137,13 +133,13 @@ setPedidos((prev) =>
       : pedido
   )
 )
-```
+
 
 }
 
 return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-auto px-5 pb-20">
 
-```
+
     <div className="pt-8 pb-8">
 
       <Link
@@ -196,7 +192,6 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
         'Entregado',
         'Cancelado'
       ].map((item) => (
-
         <button
           key={item}
           onClick={() =>
@@ -207,18 +202,17 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
             background:
               filtro === item
                 ? '#c6302c'
-                : '#fff',
+                : '#ffffff',
             color:
               filtro === item
-                ? '#fff'
-                : '#000',
+                ? '#ffffff'
+                : '#000000',
             borderColor:
               '#e5e5e5'
           }}
         >
           {item}
         </button>
-
       ))}
 
     </div>
@@ -229,7 +223,6 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
 
     {pedidosFiltrados.map(
       (pedido) => {
-
         const statusStyle =
           getStatusStyle(
             pedido.estatus
@@ -242,7 +235,7 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
             className="block editorial-card mb-4 hover:-translate-y-[1px] transition"
           >
 
-            <div className="flex justify-between">
+            <div className="flex justify-between items-start">
 
               <div>
                 <p className="customer-name">
@@ -277,17 +270,18 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
                     statusStyle.color
                 }}
               >
-                <option>
+                <option value="Pendiente">
                   Pendiente
                 </option>
 
-                <option>
+                <option value="Entregado">
                   Entregado
                 </option>
 
-                <option>
+                <option value="Cancelado">
                   Cancelado
                 </option>
+
               </select>
 
             </div>
@@ -325,4 +319,4 @@ return ( <main className="min-h-screen bg-white"> <div className="max-w-md mx-au
 </main>
 
 )
-    }
+}
