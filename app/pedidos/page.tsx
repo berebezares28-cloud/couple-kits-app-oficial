@@ -35,7 +35,7 @@ export default async function PedidosPage() {
           )
           .filter(Boolean) ?? []
     })) ?? []
-
+ 
   return (
     <PedidosClient
       pedidosIniciales={pedidosConKits}
