@@ -56,6 +56,9 @@ export default function PedidosClient({
   const [filtroFecha, setFiltroFecha] =
     useState('Todas')
 
+    const [fechaSeleccionada, setFechaSeleccionada] =
+    useState('')
+
   const [pedidos, setPedidos] =
     useState(pedidosIniciales)
 
@@ -104,33 +107,28 @@ export default function PedidosClient({
           ? true
           : pedido.estatus === filtro
 
-      let coincideFecha = true
+          let coincideFecha = true
 
-      if (filtroFecha === 'Hoy') {
-        coincideFecha =
-          pedido.fecha_entrega ===
-          hoyString
-      }
-
-      if (filtroFecha === 'Mañana') {
-        coincideFecha =
-          pedido.fecha_entrega ===
-          mananaString
-      }
-
-      if (
-        filtroFecha ===
-        'Esta semana'
-      ) {
-        const fechaPedido =
-          new Date(
-            pedido.fecha_entrega
-          )
-
-        coincideFecha =
-          fechaPedido >= hoy &&
-          fechaPedido <= dentroDe7Dias
-      }
+          if (fechaSeleccionada) {
+            coincideFecha =
+              pedido.fecha_entrega ===
+              fechaSeleccionada
+          } else if (filtroFecha === 'Hoy') {
+            coincideFecha =
+              pedido.fecha_entrega ===
+              hoyString
+          } else if (filtroFecha === 'Mañana') {
+            coincideFecha =
+              pedido.fecha_entrega ===
+              mananaString
+          } else if (filtroFecha === 'Esta semana') {
+            const fechaPedido =
+              new Date(pedido.fecha_entrega)
+          
+            coincideFecha =
+              fechaPedido >= hoy &&
+              fechaPedido <= dentroDe7Dias
+          }
 
       return (
         coincideBusqueda &&
@@ -296,6 +294,47 @@ export default function PedidosClient({
           ))}
 
         </div>
+        <div className="mb-8">
+
+  <p
+    style={{
+      fontSize: '0.72rem',
+      letterSpacing: '0.25em',
+      textTransform: 'uppercase',
+      color: '#888',
+      marginBottom: '0.7rem'
+    }}
+  >
+    Fecha específica
+  </p>
+
+  <input
+    type="date"
+    value={fechaSeleccionada}
+    onChange={(e) => {
+      setFechaSeleccionada(
+        e.target.value
+      )
+
+      if (e.target.value) {
+        setFiltroFecha('Todas')
+      }
+    }}
+    className="w-full rounded-xl border px-4 py-3"
+  />
+
+  {fechaSeleccionada && (
+    <button
+      onClick={() =>
+        setFechaSeleccionada('')
+      }
+      className="text-sm mt-3 text-gray-500 underline"
+    >
+      Limpiar fecha
+    </button>
+  )}
+
+</div>
 
         <p className="text-sm text-gray-500 mb-6">
           {pedidosFiltrados.length} pedidos
