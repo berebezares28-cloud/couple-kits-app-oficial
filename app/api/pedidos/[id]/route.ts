@@ -1,9 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getSupabaseAdminOrError } from '../../../../scr/lib/supabase-admin'
 
 const EDITABLE_FIELDS = [
   'estatus',
@@ -21,6 +17,16 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = getSupabaseAdminOrError()
+
+    if ('error' in admin) {
+      return Response.json(
+        { error: admin.error },
+        { status: 500 }
+      )
+    }
+
+    const supabase = admin.client
     const body = await req.json()
 
     const update: Record<string, string | null> = {}
@@ -50,9 +56,7 @@ export async function PATCH(
       )
     }
 
-    return Response.json({
-      success: true
-    })
+    return Response.json({ success: true })
   } catch (error) {
     console.error(error)
 

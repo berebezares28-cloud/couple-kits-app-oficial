@@ -1,10 +1,10 @@
 import './globals.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/700.css'
+import '@fontsource/inter/800.css'
+import '@fontsource/inter/900.css'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-
-const inter = Inter({
-  subsets: ['latin']
-})
+import BottomNav from './components/BottomNav'
 
 export const metadata: Metadata = {
   title: 'Couple Kits',
@@ -12,14 +12,15 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({
-  children,
+  children
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
-      <body className={inter.className}>
+    <html lang="es" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         {children}
+        <BottomNav />
       </body>
     </html>
   )

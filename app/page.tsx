@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
 import Image from 'next/image'
+import Link from 'next/link'
+import { listarInsumosConStock } from '../scr/lib/calcularStock'
 import { supabase } from '../scr/lib/supabase'
 
 function getStatusStyle(status: string) {
@@ -51,16 +53,14 @@ export default async function Home() {
     .from('insumos')
     .select('*', { count: 'exact', head: true })
 
-  const { data: insumosCriticosData } = await supabase
-    .from('insumos')
-    .select('stock_actual, stock_minimo')
+  const insumosConStock =
+    await listarInsumosConStock(supabase)
 
-  const insumosCriticos =
-    insumosCriticosData?.filter(
-      (i) =>
-        Number(i.stock_actual) <=
-        Number(i.stock_minimo)
-    ).length ?? 0
+  const insumosCriticos = insumosConStock.filter(
+    (i) =>
+      Number(i.stock_actual) <=
+      Number(i.stock_minimo)
+  ).length
 
   const { data: pedidos } = await supabase
     .from('pedidos')
@@ -83,7 +83,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pb-20">
+      <div className="max-w-md mx-auto px-5 pb-24">
 
         {/* HEADER */}
 
@@ -133,7 +133,10 @@ export default async function Home() {
 
         <div className="grid grid-cols-2 gap-4">
 
-          <div className="editorial-card">
+          <Link
+            href="/pedidos?estatus=Pendiente"
+            className="editorial-card block hover:-translate-y-[1px] transition"
+          >
             <p className="metric-label">
               📦 Pedidos pendientes
             </p>
@@ -144,9 +147,12 @@ export default async function Home() {
             >
               {pedidosPendientes ?? 0}
             </h2>
-          </div>
+          </Link>
 
-          <div className="editorial-card">
+          <Link
+            href="/kits"
+            className="editorial-card block hover:-translate-y-[1px] transition"
+          >
             <p className="metric-label">
               🎨 Kits activos
             </p>
@@ -154,9 +160,12 @@ export default async function Home() {
             <h2 className="metric-value">
               {kitsActivos ?? 0}
             </h2>
-          </div>
+          </Link>
 
-          <div className="editorial-card">
+          <Link
+            href="/insumos"
+            className="editorial-card block hover:-translate-y-[1px] transition"
+          >
             <p className="metric-label">
               📚 Insumos registrados
             </p>
@@ -164,9 +173,12 @@ export default async function Home() {
             <h2 className="metric-value">
               {insumosRegistrados ?? 0}
             </h2>
-          </div>
+          </Link>
 
-          <div className="editorial-card">
+          <Link
+            href="/insumos?criticos=1"
+            className="editorial-card block hover:-translate-y-[1px] transition"
+          >
             <p className="metric-label">
               ⚠️ Insumos críticos
             </p>
@@ -174,7 +186,7 @@ export default async function Home() {
             <h2 className="metric-value">
               {insumosCriticos}
             </h2>
-          </div>
+          </Link>
 
         </div>
 
@@ -208,9 +220,10 @@ export default async function Home() {
                 )
 
               return (
-                <div
+                <Link
                   key={pedido.id}
-                  className="editorial-card mb-4"
+                  href={`/pedidos/${pedido.id}`}
+                  className="editorial-card mb-4 block hover:-translate-y-[1px] transition"
                 >
 
                   <div className="flex justify-between items-start">
@@ -263,7 +276,7 @@ export default async function Home() {
 
                   </div>
 
-                </div>
+                </Link>
               )
             })
           ) : (

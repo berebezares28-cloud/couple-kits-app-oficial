@@ -1,7 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { supabase } from '../../../scr/lib/supabase'
+import {
+  obtenerConsumoDesdeKits,
+  syncPedidoKits
+} from '../../../scr/lib/descontarInventario'
 
 type Pedido = {
   id: string
@@ -17,9 +23,15 @@ type Pedido = {
   nota: string | null
 }
 
-type Kit = {
+type PedidoKit = {
+  kit_id: string
   nombre: string
   cantidad: number
+}
+
+type KitDisponible = {
+  id: string
+  nombre: string
 }
 
 function getStatusStyle(status: string) {
@@ -54,6 +66,12 @@ function getStatusStyle(status: string) {
   }
 }
 
+type ConsumoLinea = {
+  insumoId: string
+  nombre: string
+  cantidad: number
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-xs tracking-[0.25em] text-gray-400 uppercase mb-4">
@@ -62,24 +80,107 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
+const METODOS_PAGO = [
+  'Mercado Pago',
+  'Efectivo',
+  'Nu'
+] as const
+
 const inputClass =
   'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition'
 
 export default function PedidoDetalle({
   pedido: pedidoInicial,
-  kits
+  kits: kitsIniciales,
+  kitsDisponibles
 }: {
   pedido: Pedido
-  kits: Kit[]
+  kits: PedidoKit[]
+  kitsDisponibles: KitDisponible[]
 }) {
   const [pedido, setPedido] = useState(pedidoInicial)
+  const [kitsPedido, setKitsPedido] =
+    useState(kitsIniciales)
+  const [kitSeleccionado, setKitSeleccionado] =
+    useState('')
   const [guardando, setGuardando] = useState(false)
+  const [consumoPreview, setConsumoPreview] =
+    useState<ConsumoLinea[]>([])
   const [mensaje, setMensaje] = useState<{
     tipo: 'ok' | 'error'
     texto: string
   } | null>(null)
 
+  const router = useRouter()
+
+  useEffect(() => {
+    async function cargarPedidoActual() {
+      const { data: pedidoDb } = await supabase
+        .from('pedidos')
+        .select('*')
+        .eq('id', pedidoInicial.id)
+        .single()
+
+      if (pedidoDb) {
+        setPedido(pedidoDb)
+      }
+
+      const { data: pedidoKits } = await supabase
+        .from('pedido_kits')
+        .select(`
+          kit_id,
+          cantidad,
+          kits ( nombre )
+        `)
+        .eq('pedido_id', pedidoInicial.id)
+
+      if (pedidoKits) {
+        const kitsCargados = pedidoKits.map(
+          (item: any) => ({
+            kit_id: item.kit_id,
+            nombre: item.kits?.nombre ?? 'Kit',
+            cantidad: item.cantidad
+          })
+        )
+
+        setKitsPedido(kitsCargados)
+      }
+    }
+
+    cargarPedidoActual()
+  }, [pedidoInicial.id])
+
+  useEffect(() => {
+    async function cargarConsumo() {
+      if (pedido.estatus !== 'Entregado') {
+        setConsumoPreview([])
+        return
+      }
+
+      const consumo = await obtenerConsumoDesdeKits(
+        supabase,
+        kitsPedido.map((k) => ({
+          kit_id: k.kit_id,
+          cantidad: k.cantidad
+        }))
+      )
+
+      if (consumo.ok) {
+        setConsumoPreview(consumo.lineas)
+      }
+    }
+
+    cargarConsumo()
+  }, [pedido.estatus, kitsPedido])
+
   const statusStyle = getStatusStyle(pedido.estatus)
+
+  const kitsParaAgregar = kitsDisponibles.filter(
+    (kit) =>
+      !kitsPedido.some(
+        (pk) => pk.kit_id === kit.id
+      )
+  )
 
   function actualizarCampo(
     campo: keyof Pedido,
@@ -92,52 +193,116 @@ export default function PedidoDetalle({
     setMensaje(null)
   }
 
+  function agregarKit() {
+    if (!kitSeleccionado) return
+
+    const kit = kitsDisponibles.find(
+      (k) => k.id === kitSeleccionado
+    )
+
+    if (!kit) return
+
+    setKitsPedido((prev) => [
+      ...prev,
+      {
+        kit_id: kit.id,
+        nombre: kit.nombre,
+        cantidad: 1
+      }
+    ])
+
+    setKitSeleccionado('')
+    setMensaje(null)
+  }
+
+  function quitarKit(kitId: string) {
+    setKitsPedido((prev) =>
+      prev.filter((k) => k.kit_id !== kitId)
+    )
+    setMensaje(null)
+  }
+
+  function actualizarCantidad(
+    kitId: string,
+    cantidad: number
+  ) {
+    if (cantidad < 1) return
+
+    setKitsPedido((prev) =>
+      prev.map((k) =>
+        k.kit_id === kitId
+          ? { ...k, cantidad }
+          : k
+      )
+    )
+    setMensaje(null)
+  }
+
   async function guardarCambios() {
     setGuardando(true)
     setMensaje(null)
 
-    const response = await fetch(
-      `/api/pedidos/${pedido.id}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          estatus: pedido.estatus,
-          fecha_entrega: pedido.fecha_entrega || null,
-          hora_entrega: pedido.hora_entrega || null,
-          lugar_entrega: pedido.lugar_entrega || null,
-          metodo_pago: pedido.metodo_pago || null,
-          ocasion: pedido.ocasion || null,
-          semillas: pedido.semillas || null,
-          nota: pedido.nota || null
-        })
-      }
+    const kitsResult = await syncPedidoKits(
+      supabase,
+      pedido.id,
+      kitsPedido.map((k) => ({
+        kit_id: k.kit_id,
+        cantidad: k.cantidad
+      }))
     )
 
-    setGuardando(false)
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}))
+    if (!kitsResult.ok) {
+      setGuardando(false)
       setMensaje({
         tipo: 'error',
-        texto:
-          data.error ||
-          'No se pudieron guardar los cambios'
+        texto: kitsResult.error
       })
       return
     }
 
+    const { error: pedidoError } = await supabase
+      .from('pedidos')
+      .update({
+        estatus: pedido.estatus,
+        fecha_entrega: pedido.fecha_entrega || null,
+        hora_entrega: pedido.hora_entrega || null,
+        lugar_entrega: pedido.lugar_entrega || null,
+        metodo_pago: pedido.metodo_pago || null,
+        ocasion: pedido.ocasion || null,
+        semillas: pedido.semillas || null,
+        nota: pedido.nota || null
+      })
+      .eq('id', pedido.id)
+
+    setGuardando(false)
+
+    if (pedidoError) {
+      setMensaje({
+        tipo: 'error',
+        texto: pedidoError.message
+      })
+      return
+    }
+
+    const detalleInventario =
+      pedido.estatus === 'Entregado' &&
+      consumoPreview.length > 0
+        ? `Insumos descontados en stock: ${consumoPreview.map((l) => `${l.nombre} (−${l.cantidad})`).join(', ')}`
+        : null
+
     setMensaje({
       tipo: 'ok',
-      texto: 'Cambios guardados'
+      texto: detalleInventario
+        ? `Pedido guardado. ${detalleInventario}`
+        : 'Cambios guardados'
     })
+
+    router.refresh()
   }
 
   return (
     <main className="min-h-screen bg-[#fafafa]">
-      <div className="max-w-md mx-auto px-5 py-8">
+      <div className="max-w-md mx-auto px-5 pt-8 pb-24">
 
         <Link
           href="/pedidos"
@@ -187,22 +352,83 @@ export default function PedidoDetalle({
             </select>
           </section>
 
+          {pedido.estatus === 'Entregado' && (
+            <>
+              <hr />
+
+              <section className="p-6 space-y-3">
+                <SectionLabel>Inventario</SectionLabel>
+
+                <p className="text-sm text-gray-600">
+                  Al guardar como entregado, estos insumos
+                  se restan del stock automáticamente.
+                  Si vuelves a pendiente, regresan solos.
+                </p>
+
+                {consumoPreview.length > 0 ? (
+                  <ul className="text-sm space-y-1 rounded-lg bg-gray-50 px-3 py-2">
+                    {consumoPreview.map((linea) => (
+                      <li
+                        key={linea.insumoId}
+                        className="flex justify-between gap-2"
+                      >
+                        <span>{linea.nombre}</span>
+                        <span className="text-gray-500">
+                          −{linea.cantidad}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    Sin insumos en la receta de estos kits
+                  </p>
+                )}
+              </section>
+            </>
+          )}
+
           <hr />
 
           <section className="p-6">
             <SectionLabel>Kits</SectionLabel>
 
-            <div className="space-y-2">
-              {kits.length > 0 ? (
-                kits.map((kit) => (
+            <div className="space-y-3">
+              {kitsPedido.length > 0 ? (
+                kitsPedido.map((kit) => (
                   <div
-                    key={kit.nombre}
-                    className="flex justify-between text-sm"
+                    key={kit.kit_id}
+                    className="flex items-center gap-2"
                   >
-                    <span>{kit.nombre}</span>
-                    <span className="text-gray-400">
-                      x{kit.cantidad}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">
+                        {kit.nombre}
+                      </p>
+                    </div>
+
+                    <input
+                      type="number"
+                      min="1"
+                      value={kit.cantidad}
+                      onChange={(e) =>
+                        actualizarCantidad(
+                          kit.kit_id,
+                          Number(e.target.value)
+                        )
+                      }
+                      className="w-16 rounded-lg border px-2 py-2 text-sm text-center"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        quitarKit(kit.kit_id)
+                      }
+                      className="shrink-0 w-9 h-9 rounded-lg border text-red-600 hover:bg-red-50 transition"
+                      aria-label={`Quitar ${kit.nombre}`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))
               ) : (
@@ -211,6 +437,41 @@ export default function PedidoDetalle({
                 </p>
               )}
             </div>
+
+            {kitsParaAgregar.length > 0 && (
+              <div className="mt-4 flex gap-2">
+                <select
+                  value={kitSeleccionado}
+                  onChange={(e) =>
+                    setKitSeleccionado(
+                      e.target.value
+                    )
+                  }
+                  className={`${inputClass} flex-1`}
+                >
+                  <option value="">
+                    Agregar kit...
+                  </option>
+                  {kitsParaAgregar.map((kit) => (
+                    <option
+                      key={kit.id}
+                      value={kit.id}
+                    >
+                      {kit.nombre}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={agregarKit}
+                  disabled={!kitSeleccionado}
+                  className="shrink-0 px-4 rounded-xl border font-semibold hover:bg-gray-50 transition disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
+            )}
           </section>
 
           <hr />
@@ -277,9 +538,7 @@ export default function PedidoDetalle({
           <section className="p-6">
             <SectionLabel>Pago</SectionLabel>
 
-            <input
-              type="text"
-              placeholder="Método de pago"
+            <select
               value={pedido.metodo_pago ?? ''}
               onChange={(e) =>
                 actualizarCampo(
@@ -288,7 +547,26 @@ export default function PedidoDetalle({
                 )
               }
               className={inputClass}
-            />
+            >
+              <option value="">
+                Seleccionar método...
+              </option>
+              {METODOS_PAGO.map((metodo) => (
+                <option key={metodo} value={metodo}>
+                  {metodo}
+                </option>
+              ))}
+              {pedido.metodo_pago &&
+                !METODOS_PAGO.includes(
+                  pedido.metodo_pago as (typeof METODOS_PAGO)[number]
+                ) && (
+                  <option
+                    value={pedido.metodo_pago}
+                  >
+                    {pedido.metodo_pago}
+                  </option>
+                )}
+            </select>
           </section>
 
           <hr />

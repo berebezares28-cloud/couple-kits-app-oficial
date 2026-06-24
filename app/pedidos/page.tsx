@@ -1,5 +1,8 @@
+import { Suspense } from 'react'
 import { supabase } from '../../scr/lib/supabase'
 import PedidosClient from './PedidosClient'
+
+export const dynamic = 'force-dynamic'
 
 export default async function PedidosPage() {
   const { data: pedidos } = await supabase
@@ -37,8 +40,18 @@ export default async function PedidosPage() {
     })) ?? []
  
   return (
-    <PedidosClient
-      pedidosIniciales={pedidosConKits}
-    />
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-white">
+          <div className="max-w-md mx-auto px-5 pt-8 pb-24">
+            <p className="text-gray-500">Cargando pedidos...</p>
+          </div>
+        </main>
+      }
+    >
+      <PedidosClient
+        pedidosIniciales={pedidosConKits}
+      />
+    </Suspense>
   )
 }

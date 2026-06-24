@@ -1,7 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { supabase } from '../../scr/lib/supabase'
 
 type Pedido = {
   id: string
@@ -47,6 +49,9 @@ export default function PedidosClient({
 }: {
   pedidosIniciales: Pedido[]
 }) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [busqueda, setBusqueda] =
     useState('')
 
@@ -61,6 +66,87 @@ export default function PedidosClient({
 
   const [pedidos, setPedidos] =
     useState(pedidosIniciales)
+
+  async function cargarPedidos() {
+    try {
+      const { data: lista, error } = await supabase
+        .from('pedidos')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error || !lista) return
+
+      const pedidoIds = lista.map((p) => p.id)
+
+      let pedidoKits: {
+        pedido_id: string
+        kits: { nombre: string } | { nombre: string }[] | null
+      }[] = []
+
+      if (pedidoIds.length > 0) {
+        const { data } = await supabase
+          .from('pedido_kits')
+          .select(`
+            pedido_id,
+            kits (
+              nombre
+            )
+          `)
+          .in('pedido_id', pedidoIds)
+
+        pedidoKits = data ?? []
+      }
+
+      const pedidosConKits = lista.map((pedido) => ({
+        id: pedido.id,
+        nombre: pedido.nombre,
+        instagram: pedido.instagram,
+        lugar_entrega: pedido.lugar_entrega,
+        fecha_entrega: pedido.fecha_entrega,
+        hora_entrega: pedido.hora_entrega,
+        estatus: pedido.estatus,
+        kits:
+          pedidoKits
+            .filter((pk) => pk.pedido_id === pedido.id)
+            .map((pk) => {
+              const kit = pk.kits
+              if (Array.isArray(kit)) {
+                return kit[0]?.nombre
+              }
+              return kit?.nombre
+            })
+            .filter((nombre): nombre is string =>
+              Boolean(nombre)
+            )
+      }))
+
+      setPedidos(pedidosConKits)
+    } catch (error) {
+      console.error('Error cargando pedidos', error)
+    }
+  }
+
+  useEffect(() => {
+    if (pathname === '/pedidos') {
+      cargarPedidos()
+    }
+  }, [pathname])
+
+  useEffect(() => {
+    const estatus = searchParams.get('estatus')
+
+    if (
+      estatus &&
+      [
+        'Todos',
+        'Pendiente',
+        'Entregado',
+        'Cancelado'
+      ].includes(estatus)
+    ) {
+      setFiltro(estatus)
+    }
+  }, [searchParams])
 
   const pedidosFiltrados = useMemo(() => {
     const q =
@@ -147,24 +233,13 @@ export default function PedidosClient({
     pedidoId: string,
     nuevoEstatus: string
   ) {
-    const response = await fetch(
-      `/api/pedidos/${pedidoId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type':
-            'application/json'
-        },
-        body: JSON.stringify({
-          estatus: nuevoEstatus
-        })
-      }
-    )
+    const { error } = await supabase
+      .from('pedidos')
+      .update({ estatus: nuevoEstatus })
+      .eq('id', pedidoId)
 
-    if (!response.ok) {
-      alert(
-        'Error actualizando pedido'
-      )
+    if (error) {
+      alert(error.message)
       return
     }
 
@@ -183,16 +258,9 @@ export default function PedidosClient({
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pb-20">
+      <div className="max-w-md mx-auto px-5 pb-24">
 
         <div className="pt-8 pb-8">
-
-          <Link
-            href="/"
-            className="text-sm text-gray-500"
-          >
-            ← Dashboard
-          </Link>
 
           <h1
             className="editorial-title mt-4"
