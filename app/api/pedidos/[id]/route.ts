@@ -5,6 +5,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const EDITABLE_FIELDS = [
+  'estatus',
+  'fecha_entrega',
+  'hora_entrega',
+  'lugar_entrega',
+  'metodo_pago',
+  'ocasion',
+  'semillas',
+  'nota',
+] as const
+
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
@@ -12,13 +23,24 @@ export async function PATCH(
   try {
     const body = await req.json()
 
+    const update: Record<string, string | null> = {}
+
+    for (const field of EDITABLE_FIELDS) {
+      if (field in body) {
+        update[field] = body[field] ?? null
+      }
+    }
+
+    if (Object.keys(update).length === 0) {
+      return Response.json(
+        { error: 'No hay campos para actualizar' },
+        { status: 400 }
+      )
+    }
+
     const { error } = await supabase
       .from('pedidos')
-      .update({
-        estatus: body.estatus,
-        fecha_entrega: body.fecha_entrega,
-        hora_entrega: body.hora_entrega
-      })
+      .update(update)
       .eq('id', params.id)
 
     if (error) {
