@@ -226,6 +226,7 @@ export default function PedidosClient({
     busqueda,
     filtro,
     filtroFecha,
+    fechaSeleccionada,
     pedidos
   ])
 

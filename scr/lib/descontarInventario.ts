@@ -232,31 +232,23 @@ async function registrarMovimiento(
       ? `Entrega pedido ${pedidoId}`
       : `Reversa pedido ${pedidoId}`
 
-  const intentos = [
-    {
-      pedido_id: pedidoId,
-      insumo_id: insumoId,
-      cantidad,
-      tipo,
-      motivo,
-      fecha: hoy
-    },
-    {
-      insumo_id: insumoId,
-      cantidad,
-      tipo,
-      motivo,
-      fecha: hoy
-    }
-  ]
-
-  for (const fila of intentos) {
-    const { error } = await supabase
-      .from('movimientos_inventario')
-      .insert(fila)
-
-    if (!error) return
+  const base = {
+    insumo_id: insumoId,
+    cantidad,
+    tipo,
+    motivo,
+    fecha: hoy
   }
+
+  const { error: errorConPedido } = await supabase
+    .from('movimientos_inventario')
+    .insert({ ...base, pedido_id: pedidoId })
+
+  if (!errorConPedido) return
+
+  await supabase
+    .from('movimientos_inventario')
+    .insert(base)
 }
 
 async function aplicarConsumo(
