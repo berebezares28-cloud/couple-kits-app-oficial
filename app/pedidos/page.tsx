@@ -12,6 +12,7 @@ type PedidoRow = {
   fecha_entrega: string
   hora_entrega: string
   estatus: string
+  kitLineas: { nombre: string; cantidad: number }[]
   kits: string[]
   eliminado_at?: string | null
 }
@@ -32,6 +33,7 @@ async function pedidosConKits(
 
   let pedidoKits: {
     pedido_id: string
+    cantidad: number
     kits: { nombre: string } | { nombre: string }[] | null
   }[] = []
 
@@ -40,6 +42,7 @@ async function pedidosConKits(
       .from('pedido_kits')
       .select(`
         pedido_id,
+        cantidad,
         kits (
           nombre
         )
@@ -50,18 +53,8 @@ async function pedidosConKits(
   }
 
   return (
-    pedidos?.map((pedido) => ({
-      id: pedido.id,
-      nombre: pedido.nombre ?? '',
-      instagram: pedido.instagram ?? '',
-      lugar_entrega: pedido.lugar_entrega ?? '',
-      fecha_entrega: pedido.fecha_entrega ?? '',
-      hora_entrega: pedido.hora_entrega ?? '',
-      estatus: pedido.estatus ?? 'Pendiente',
-      eliminado_at: filtroEliminado
-        ? pedido.eliminado_at ?? null
-        : undefined,
-      kits: pedidoKits
+    pedidos?.map((pedido) => {
+      const lineasPedido = pedidoKits
         .filter((pk) => pk.pedido_id === pedido.id)
         .flatMap((pk) => {
           const kit = pk.kits
@@ -69,9 +62,35 @@ async function pedidosConKits(
             ? kit[0]?.nombre
             : kit?.nombre
 
-          return nombre ? [nombre] : []
+          if (!nombre) return []
+
+          return [
+            {
+              nombre,
+              cantidad: Number(pk.cantidad) || 1
+            }
+          ]
         })
-    })) ?? []
+
+      return {
+        id: pedido.id,
+        nombre: pedido.nombre ?? '',
+        instagram: pedido.instagram ?? '',
+        lugar_entrega: pedido.lugar_entrega ?? '',
+        fecha_entrega: pedido.fecha_entrega ?? '',
+        hora_entrega: pedido.hora_entrega ?? '',
+        estatus: pedido.estatus ?? 'Pendiente',
+        eliminado_at: filtroEliminado
+          ? pedido.eliminado_at ?? null
+          : undefined,
+        kitLineas: lineasPedido,
+        kits: lineasPedido.map((l) =>
+          l.cantidad > 1
+            ? `${l.nombre} ×${l.cantidad}`
+            : l.nombre
+        )
+      }
+    }) ?? []
   )
 }
 
