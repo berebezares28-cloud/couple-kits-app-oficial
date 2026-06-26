@@ -57,17 +57,16 @@ async function pedidosConKits(
       fecha_entrega: pedido.fecha_entrega ?? '',
       hora_entrega: pedido.hora_entrega ?? '',
       estatus: pedido.estatus ?? 'Pendiente',
-      kits:
-        pedidoKits
-          .filter((pk) => pk.pedido_id === pedido.id)
-          .map((pk) => {
-            const kit = pk.kits
-            if (Array.isArray(kit)) {
-              return kit[0]?.nombre
-            }
-            return kit?.nombre
-          })
-          .filter(Boolean) ?? []
+      kits: pedidoKits
+        .filter((pk) => pk.pedido_id === pedido.id)
+        .flatMap((pk) => {
+          const kit = pk.kits
+          const nombre = Array.isArray(kit)
+            ? kit[0]?.nombre
+            : kit?.nombre
+
+          return nombre ? [nombre] : []
+        })
     })) ?? []
   )
 }

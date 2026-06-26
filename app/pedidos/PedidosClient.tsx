@@ -111,19 +111,19 @@ export default function PedidosClient({
       fecha_entrega: pedido.fecha_entrega,
       hora_entrega: pedido.hora_entrega,
       estatus: pedido.estatus,
-      kits:
-        (pedidoKits ?? [])
-          .filter((pk) => pk.pedido_id === pedido.id)
-          .map((pk) => {
-            const kit = pk.kits
-            if (Array.isArray(kit)) {
-              return kit[0]?.nombre
-            }
-            return kit?.nombre
-          })
-          .filter((nombre): nombre is string =>
-            Boolean(nombre)
-          )
+      kits: (pedidoKits ?? [])
+        .filter((pk) => pk.pedido_id === pedido.id)
+        .flatMap((pk) => {
+          const kit = pk.kits as
+            | { nombre: string }
+            | { nombre: string }[]
+            | null
+          const nombre = Array.isArray(kit)
+            ? kit[0]?.nombre
+            : kit?.nombre
+
+          return nombre ? [nombre] : []
+        })
     }))
   }
 

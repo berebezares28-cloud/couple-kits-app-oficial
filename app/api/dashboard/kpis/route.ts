@@ -2,8 +2,8 @@ import {
   obtenerBloqueRango,
   rangoPorDefecto,
   validarRangoFechas
-} from '../../../scr/lib/dashboardData'
-import { supabase } from '../../../scr/lib/supabase'
+} from '../../../../scr/lib/dashboardData'
+import { supabase } from '../../../../scr/lib/supabase'
 
 export async function GET(req: Request) {
   try {
