@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
 import { listarInsumosConStock } from '../scr/lib/calcularStock'
+import { obtenerResumenVentasMes } from '../scr/lib/resumenVentasMes'
 import { supabase } from '../scr/lib/supabase'
 
 function getStatusStyle(status: string) {
@@ -41,20 +42,17 @@ export default async function Home() {
     .from('pedidos')
     .select('*', { count: 'exact', head: true })
     .eq('estatus', 'Pendiente')
-
-    console.log('PEDIDOS:', pedidosPendientes)
+    .neq('eliminado', true)
 
   const { count: kitsActivos } = await supabase
     .from('kits')
     .select('*', { count: 'exact', head: true })
     .eq('activo', true)
 
-  const { count: insumosRegistrados } = await supabase
-    .from('insumos')
-    .select('*', { count: 'exact', head: true })
-
-  const insumosConStock =
-    await listarInsumosConStock(supabase)
+  const [insumosConStock, ventasMes] = await Promise.all([
+    listarInsumosConStock(supabase),
+    obtenerResumenVentasMes(supabase)
+  ])
 
   const insumosCriticos = insumosConStock.filter(
     (i) =>
@@ -65,6 +63,7 @@ export default async function Home() {
   const { data: pedidos } = await supabase
     .from('pedidos')
     .select('*')
+    .neq('eliminado', true)
     .order('created_at', { ascending: false })
     .limit(20)
 
@@ -122,7 +121,7 @@ export default async function Home() {
     paddingLeft: '0.35rem'
   }}
 >
-  Studio test 123
+  estudio
 </p>
             </div>
 
@@ -163,20 +162,7 @@ export default async function Home() {
           </Link>
 
           <Link
-            href="/insumos"
-            className="editorial-card block hover:-translate-y-[1px] transition"
-          >
-            <p className="metric-label">
-              📚 Insumos registrados
-            </p>
-
-            <h2 className="metric-value">
-              {insumosRegistrados ?? 0}
-            </h2>
-          </Link>
-
-          <Link
-            href="/insumos?criticos=1"
+            href="/insumos/criticos"
             className="editorial-card block hover:-translate-y-[1px] transition"
           >
             <p className="metric-label">
@@ -188,6 +174,52 @@ export default async function Home() {
             </h2>
           </Link>
 
+          <Link
+            href="/ventas"
+            className="editorial-card block hover:-translate-y-[1px] transition"
+          >
+            <p className="metric-label">
+              💰 Ventas del mes
+            </p>
+
+            <h2
+              className="metric-value"
+              style={{ color: '#389E0D' }}
+            >
+              {ventasMes.totalVentas}
+            </h2>
+          </Link>
+
+        </div>
+
+        <div className="mt-8 space-y-3">
+          <Link
+            href="/dashboard"
+            className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
+          >
+            <div>
+              <p className="font-semibold">📊 Dashboard</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                KPIs, tendencias e insights del negocio
+              </p>
+            </div>
+            <span className="text-gray-400">→</span>
+          </Link>
+
+          <Link
+            href="/contenido"
+            className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
+          >
+            <div>
+              <p className="font-semibold">
+                📱 Diario de contenido
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Publicaciones, anuncios y performance
+              </p>
+            </div>
+            <span className="text-gray-400">→</span>
+          </Link>
         </div>
 
         {/* PEDIDOS */}

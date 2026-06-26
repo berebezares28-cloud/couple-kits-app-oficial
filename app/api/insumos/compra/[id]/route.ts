@@ -2,6 +2,7 @@ import {
   actualizarCompraInsumo,
   calcularCostoPromedioSimple,
   calcularStockPorInsumo,
+  eliminarCompraInsumo,
   obtenerHistorialCompras
 } from '../../../../../scr/lib/calcularStock'
 import { supabase } from '../../../../../scr/lib/supabase'
@@ -73,6 +74,54 @@ export async function PATCH(
 
     return Response.json(
       { error: 'Error actualizando compra' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const url = new URL(req.url)
+    const insumoId = url.searchParams.get('insumoId')
+
+    if (!insumoId) {
+      return Response.json(
+        { error: 'Falta el insumo' },
+        { status: 400 }
+      )
+    }
+
+    const resultado = await eliminarCompraInsumo(
+      supabase,
+      params.id,
+      insumoId
+    )
+
+    if (!resultado.ok) {
+      return Response.json(
+        { error: resultado.error },
+        { status: 500 }
+      )
+    }
+
+    const [stock, compras] = await Promise.all([
+      calcularStockPorInsumo(supabase, insumoId),
+      obtenerHistorialCompras(supabase, insumoId)
+    ])
+
+    return Response.json({
+      success: true,
+      stock,
+      costoPromedio: calcularCostoPromedioSimple(compras)
+    })
+  } catch (error) {
+    console.error(error)
+
+    return Response.json(
+      { error: 'Error eliminando compra' },
       { status: 500 }
     )
   }

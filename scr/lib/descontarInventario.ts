@@ -1,4 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  calcularConsumoDesdeSnapshots,
+  insertarPedidoKitsConSnapshot
+} from './pedidoSnapshots'
 
 const MARCADOR_INVENTARIO = '[inventario_aplicado]'
 
@@ -105,14 +109,14 @@ async function calcularConsumoPedido(
   const { data: pedidoKits, error: kitsError } =
     await supabase
       .from('pedido_kits')
-      .select('kit_id, cantidad')
+      .select('id, kit_id, cantidad')
       .eq('pedido_id', pedidoId)
 
   if (kitsError) {
     return { ok: false, error: kitsError.message }
   }
 
-  return calcularConsumoDesdeKits(
+  return calcularConsumoDesdeSnapshots(
     supabase,
     pedidoKits ?? []
   )
@@ -437,21 +441,11 @@ export async function syncPedidoKits(
     return { ok: true }
   }
 
-  const rows = kits.map((kit) => ({
-    pedido_id: pedidoId,
-    kit_id: kit.kit_id,
-    cantidad: kit.cantidad
-  }))
-
-  const { error: insertError } = await supabase
-    .from('pedido_kits')
-    .insert(rows)
-
-  if (insertError) {
-    return { ok: false, error: insertError.message }
-  }
-
-  return { ok: true }
+  return insertarPedidoKitsConSnapshot(
+    supabase,
+    pedidoId,
+    kits
+  )
 }
 
 export function pedidoSaleDeEntregado(
@@ -482,4 +476,98 @@ export async function inventarioYaAplicado(
     supabase,
     pedidoId
   )
+}
+
+export async function eliminarPedido(
+  supabase: SupabaseClient,
+  pedidoId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: pedido, error: fetchError } =
+    await supabase
+      .from('pedidos')
+      .select('estatus, eliminado')
+      .eq('id', pedidoId)
+      .single()
+
+  if (fetchError || !pedido) {
+    return {
+      ok: false,
+      error: fetchError?.message ?? 'Pedido no encontrado'
+    }
+  }
+
+  if (pedido.eliminado) {
+    return { ok: true }
+  }
+
+  if (pedido.estatus === 'Entregado') {
+    const reversa = await revertirInventarioPedido(
+      supabase,
+      pedidoId
+    )
+
+    if (!reversa.ok) {
+      return reversa
+    }
+  }
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ eliminado: true })
+    .eq('id', pedidoId)
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  return { ok: true }
+}
+
+export async function restaurarPedido(
+  supabase: SupabaseClient,
+  pedidoId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: pedido, error: fetchError } =
+    await supabase
+      .from('pedidos')
+      .select(
+        'estatus, eliminado, punto_entrega_id'
+      )
+      .eq('id', pedidoId)
+      .single()
+
+  if (fetchError || !pedido) {
+    return {
+      ok: false,
+      error: fetchError?.message ?? 'Pedido no encontrado'
+    }
+  }
+
+  if (!pedido.eliminado) {
+    return { ok: true }
+  }
+
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ eliminado: false })
+    .eq('id', pedidoId)
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  const esLocal = Boolean(pedido.punto_entrega_id)
+
+  if (pedido.estatus === 'Entregado' && !esLocal) {
+    const descuento = await descontarInventarioPedido(
+      supabase,
+      pedidoId
+    )
+
+    if (!descuento.ok) {
+      return descuento
+    }
+  }
+
+  return { ok: true }
 }

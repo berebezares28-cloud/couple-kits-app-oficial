@@ -1,6 +1,7 @@
 import {
   registrarEntradaInsumo
 } from '../../../../scr/lib/calcularStock'
+import { agregarInsumoARecetasKits } from '../../../../scr/lib/pedidoSnapshots'
 import { supabase } from '../../../../scr/lib/supabase'
 
 export async function POST(req: Request) {
@@ -80,6 +81,35 @@ export async function POST(req: Request) {
       if (!entrada.ok) {
         return Response.json(
           { error: entrada.error },
+          { status: 500 }
+        )
+      }
+    }
+
+    const asignaciones = Array.isArray(body.asignaciones_kits)
+      ? body.asignaciones_kits
+          .filter(
+            (a: { kit_id?: string; cantidad?: number }) =>
+              a.kit_id && Number(a.cantidad) > 0
+          )
+          .map(
+            (a: { kit_id: string; cantidad: number }) => ({
+              kit_id: a.kit_id,
+              cantidad: Number(a.cantidad)
+            })
+          )
+      : []
+
+    if (asignaciones.length > 0) {
+      const recetas = await agregarInsumoARecetasKits(
+        supabase,
+        data.id,
+        asignaciones
+      )
+
+      if (!recetas.ok) {
+        return Response.json(
+          { error: recetas.error },
           { status: 500 }
         )
       }

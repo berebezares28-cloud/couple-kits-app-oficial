@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { insertarPedidoKitsConSnapshot } from '../../../scr/lib/pedidoSnapshots'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -101,6 +102,10 @@ export async function POST(req: Request) {
     }
 
     const pedidoId = pedidoCreado.id
+    const kitsParaInsertar: {
+      kit_id: string
+      cantidad: number
+    }[] = []
 
     for (const nombreKit of kitsSeleccionados) {
       const { data: kit, error: kitError } = await supabase
@@ -116,18 +121,24 @@ export async function POST(req: Request) {
         continue
       }
 
-      const { error: pedidoKitError } = await supabase
-        .from('pedido_kits')
-        .insert({
-          pedido_id: pedidoId,
-          kit_id: kit.id,
-          cantidad: 1
-        })
+      kitsParaInsertar.push({
+        kit_id: kit.id,
+        cantidad: 1
+      })
+    }
 
-      if (pedidoKitError) {
+    if (kitsParaInsertar.length > 0) {
+      const resultado =
+        await insertarPedidoKitsConSnapshot(
+          supabase,
+          pedidoId,
+          kitsParaInsertar
+        )
+
+      if (!resultado.ok) {
         console.error(
           'Error insertando pedido_kits:',
-          pedidoKitError
+          resultado.error
         )
       }
     }

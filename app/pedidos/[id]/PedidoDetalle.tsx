@@ -21,17 +21,29 @@ type Pedido = {
   ocasion: string | null
   semillas: string | null
   nota: string | null
+  recibe_comision: boolean
+  porcentaje_comision: number | null
+  punto_entrega_id: string | null
 }
 
 type PedidoKit = {
   kit_id: string
   nombre: string
   cantidad: number
+  precio_venta: number | null
+}
+
+type PuntoEntrega = {
+  id: string
+  nombre: string
+  tiene_comision: boolean
+  porcentaje_comision: number | null
 }
 
 type KitDisponible = {
   id: string
   nombre: string
+  precio_venta: number | null
 }
 
 function getStatusStyle(status: string) {
@@ -92,11 +104,13 @@ const inputClass =
 export default function PedidoDetalle({
   pedido: pedidoInicial,
   kits: kitsIniciales,
-  kitsDisponibles
+  kitsDisponibles,
+  puntosEntrega
 }: {
   pedido: Pedido
   kits: PedidoKit[]
   kitsDisponibles: KitDisponible[]
+  puntosEntrega: PuntoEntrega[]
 }) {
   const [pedido, setPedido] = useState(pedidoInicial)
   const [kitsPedido, setKitsPedido] =
@@ -104,14 +118,26 @@ export default function PedidoDetalle({
   const [kitSeleccionado, setKitSeleccionado] =
     useState('')
   const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
   const [consumoPreview, setConsumoPreview] =
     useState<ConsumoLinea[]>([])
   const [mensaje, setMensaje] = useState<{
     tipo: 'ok' | 'error'
     texto: string
   } | null>(null)
+  const [tipoEntrega, setTipoEntrega] = useState<
+    'directa' | 'local'
+  >(
+    pedidoInicial.punto_entrega_id ? 'local' : 'directa'
+  )
 
   const router = useRouter()
+
+  const esLocal = tipoEntrega === 'local'
+
+  const localSeleccionado = puntosEntrega.find(
+    (p) => p.id === pedido.punto_entrega_id
+  )
 
   useEffect(() => {
     async function cargarPedidoActual() {
@@ -130,17 +156,38 @@ export default function PedidoDetalle({
         .select(`
           kit_id,
           cantidad,
-          kits ( nombre )
+          kits ( nombre, precio_venta )
         `)
         .eq('pedido_id', pedidoInicial.id)
 
       if (pedidoKits) {
         const kitsCargados = pedidoKits.map(
-          (item: any) => ({
-            kit_id: item.kit_id,
-            nombre: item.kits?.nombre ?? 'Kit',
-            cantidad: item.cantidad
-          })
+          (item: {
+            kit_id: string
+            cantidad: number
+            kits: {
+              nombre: string
+              precio_venta: number | null
+            } | {
+              nombre: string
+              precio_venta: number | null
+            }[] | null
+          }) => {
+            const kitData = item.kits
+            const datos = Array.isArray(kitData)
+              ? kitData[0]
+              : kitData
+
+            return {
+              kit_id: item.kit_id,
+              nombre: datos?.nombre ?? 'Kit',
+              cantidad: item.cantidad,
+              precio_venta:
+                datos?.precio_venta != null
+                  ? Number(datos.precio_venta)
+                  : null
+            }
+          }
         )
 
         setKitsPedido(kitsCargados)
@@ -152,7 +199,10 @@ export default function PedidoDetalle({
 
   useEffect(() => {
     async function cargarConsumo() {
-      if (pedido.estatus !== 'Entregado') {
+      if (
+        pedido.estatus !== 'Entregado' ||
+        esLocal
+      ) {
         setConsumoPreview([])
         return
       }
@@ -171,7 +221,7 @@ export default function PedidoDetalle({
     }
 
     cargarConsumo()
-  }, [pedido.estatus, kitsPedido])
+  }, [pedido.estatus, kitsPedido, esLocal])
 
   const statusStyle = getStatusStyle(pedido.estatus)
 
@@ -207,7 +257,8 @@ export default function PedidoDetalle({
       {
         kit_id: kit.id,
         nombre: kit.nombre,
-        cantidad: 1
+        cantidad: 1,
+        precio_venta: kit.precio_venta
       }
     ])
 
@@ -242,6 +293,28 @@ export default function PedidoDetalle({
     setGuardando(true)
     setMensaje(null)
 
+    if (tipoEntrega === 'local' && !pedido.punto_entrega_id) {
+      setGuardando(false)
+      setMensaje({
+        tipo: 'error',
+        texto: 'Selecciona el local de entrega'
+      })
+      return
+    }
+
+    if (
+      tipoEntrega === 'directa' &&
+      pedido.estatus === 'Entregado' &&
+      !pedido.metodo_pago
+    ) {
+      setGuardando(false)
+      setMensaje({
+        tipo: 'error',
+        texto: 'Selecciona el método de pago para registrar la venta'
+      })
+      return
+    }
+
     const kitsResult = await syncPedidoKits(
       supabase,
       pedido.id,
@@ -270,7 +343,13 @@ export default function PedidoDetalle({
         metodo_pago: pedido.metodo_pago || null,
         ocasion: pedido.ocasion || null,
         semillas: pedido.semillas || null,
-        nota: pedido.nota || null
+        nota: pedido.nota || null,
+        recibe_comision: false,
+        porcentaje_comision: null,
+        punto_entrega_id:
+          tipoEntrega === 'local'
+            ? pedido.punto_entrega_id
+            : null
       })
       .eq('id', pedido.id)
 
@@ -285,6 +364,7 @@ export default function PedidoDetalle({
     }
 
     const detalleInventario =
+      !esLocal &&
       pedido.estatus === 'Entregado' &&
       consumoPreview.length > 0
         ? `Insumos descontados en stock: ${consumoPreview.map((l) => `${l.nombre} (−${l.cantidad})`).join(', ')}`
@@ -298,6 +378,43 @@ export default function PedidoDetalle({
     })
 
     router.refresh()
+  }
+
+  async function eliminarPedidoAccion() {
+    const confirmar = window.confirm(
+      '¿Eliminar este pedido? Si ya estaba entregado, se revertirá el inventario descontado.'
+    )
+
+    if (!confirmar) return
+
+    setEliminando(true)
+    setMensaje(null)
+
+    try {
+      const res = await fetch(`/api/pedidos/${pedido.id}`, {
+        method: 'DELETE'
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMensaje({
+          tipo: 'error',
+          texto: data.error || 'No se pudo eliminar'
+        })
+        return
+      }
+
+      router.push('/pedidos')
+      router.refresh()
+    } catch {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Error de conexión'
+      })
+    } finally {
+      setEliminando(false)
+    }
   }
 
   return (
@@ -352,7 +469,44 @@ export default function PedidoDetalle({
             </select>
           </section>
 
-          {pedido.estatus === 'Entregado' && (
+          {pedido.estatus === 'Entregado' && esLocal && (
+            <>
+              <hr />
+              <section className="p-6 space-y-3">
+                <div
+                  className="rounded-xl px-4 py-4 text-sm space-y-3"
+                  style={{
+                    background: '#FFF7E6',
+                    color: '#874D00'
+                  }}
+                >
+                  <p className="font-semibold">
+                    Pedido en local
+                    {localSeleccionado
+                      ? `: ${localSeleccionado.nombre}`
+                      : ''}
+                  </p>
+                  <p>
+                    Este pedido no cuenta como venta ni
+                    descuenta inventario. Regístralo en
+                    venta bulk del local para contabilizar
+                    kits, ingreso y comisión.
+                  </p>
+                  {pedido.punto_entrega_id && (
+                    <Link
+                      href={`/locales/venta?local=${pedido.punto_entrega_id}`}
+                      className="inline-block rounded-lg px-4 py-2 text-sm font-semibold text-white"
+                      style={{ background: '#111' }}
+                    >
+                      Ir a venta bulk
+                    </Link>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {pedido.estatus === 'Entregado' && !esLocal && (
             <>
               <hr />
 
@@ -481,93 +635,205 @@ export default function PedidoDetalle({
 
             <div>
               <label className="text-xs text-gray-500 mb-1 block">
-                Fecha
+                Tipo de entrega
               </label>
-              <input
-                type="date"
-                value={pedido.fecha_entrega ?? ''}
-                onChange={(e) =>
-                  actualizarCampo(
-                    'fecha_entrega',
-                    e.target.value
-                  )
-                }
+              <select
+                value={tipoEntrega}
+                onChange={(e) => {
+                  const tipo = e.target
+                    .value as 'directa' | 'local'
+                  setTipoEntrega(tipo)
+                  if (tipo === 'directa') {
+                    setPedido((prev) => ({
+                      ...prev,
+                      punto_entrega_id: null
+                    }))
+                  }
+                  setMensaje(null)
+                }}
                 className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">
-                Hora
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. 6:00 PM"
-                value={pedido.hora_entrega ?? ''}
-                onChange={(e) =>
-                  actualizarCampo(
-                    'hora_entrega',
-                    e.target.value
-                  )
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs text-gray-500 mb-1 block">
-                Lugar
-              </label>
-              <input
-                type="text"
-                placeholder="Lugar de entrega"
-                value={pedido.lugar_entrega ?? ''}
-                onChange={(e) =>
-                  actualizarCampo(
-                    'lugar_entrega',
-                    e.target.value
-                  )
-                }
-                className={inputClass}
-              />
-            </div>
-          </section>
-
-          <hr />
-
-          <section className="p-6">
-            <SectionLabel>Pago</SectionLabel>
-
-            <select
-              value={pedido.metodo_pago ?? ''}
-              onChange={(e) =>
-                actualizarCampo(
-                  'metodo_pago',
-                  e.target.value
-                )
-              }
-              className={inputClass}
-            >
-              <option value="">
-                Seleccionar método...
-              </option>
-              {METODOS_PAGO.map((metodo) => (
-                <option key={metodo} value={metodo}>
-                  {metodo}
+              >
+                <option value="directa">
+                  Entrega directa (no es local)
                 </option>
-              ))}
-              {pedido.metodo_pago &&
-                !METODOS_PAGO.includes(
-                  pedido.metodo_pago as (typeof METODOS_PAGO)[number]
-                ) && (
-                  <option
-                    value={pedido.metodo_pago}
+                <option value="local">
+                  Entrega en local
+                </option>
+              </select>
+            </div>
+
+            {esLocal ? (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Local
+                  </label>
+                  <select
+                    value={pedido.punto_entrega_id ?? ''}
+                    onChange={(e) => {
+                      const puntoId =
+                        e.target.value || null
+                      const punto = puntosEntrega.find(
+                        (p) => p.id === puntoId
+                      )
+
+                      setPedido((prev) => ({
+                        ...prev,
+                        punto_entrega_id: puntoId,
+                        lugar_entrega:
+                          punto?.nombre ??
+                          prev.lugar_entrega
+                      }))
+                      setMensaje(null)
+                    }}
+                    className={inputClass}
                   >
-                    {pedido.metodo_pago}
-                  </option>
-                )}
-            </select>
+                    <option value="">
+                      Seleccionar local...
+                    </option>
+                    {puntosEntrega.map((punto) => (
+                      <option
+                        key={punto.id}
+                        value={punto.id}
+                      >
+                        {punto.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div
+                  className="rounded-xl px-4 py-3 text-sm"
+                  style={{
+                    background: '#F0F5FF',
+                    color: '#1D39C4'
+                  }}
+                >
+                  Al marcar entregado, registra la venta
+                  manualmente en bulk del local para no
+                  duplicar kits vendidos.
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Fecha de entrega (referencia)
+                  </label>
+                  <input
+                    type="date"
+                    value={pedido.fecha_entrega ?? ''}
+                    onChange={(e) =>
+                      actualizarCampo(
+                        'fecha_entrega',
+                        e.target.value
+                      )
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Fecha
+                  </label>
+                  <input
+                    type="date"
+                    value={pedido.fecha_entrega ?? ''}
+                    onChange={(e) =>
+                      actualizarCampo(
+                        'fecha_entrega',
+                        e.target.value
+                      )
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Hora
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. 6:00 PM"
+                    value={pedido.hora_entrega ?? ''}
+                    onChange={(e) =>
+                      actualizarCampo(
+                        'hora_entrega',
+                        e.target.value
+                      )
+                    }
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Lugar
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Lugar de entrega"
+                    value={pedido.lugar_entrega ?? ''}
+                    onChange={(e) =>
+                      actualizarCampo(
+                        'lugar_entrega',
+                        e.target.value
+                      )
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </>
+            )}
           </section>
+
+          {!esLocal && (
+            <>
+              <hr />
+
+              <section className="p-6">
+                <SectionLabel>Pago</SectionLabel>
+
+                <p className="text-sm text-gray-600 mb-3">
+                  {pedido.estatus === 'Entregado'
+                    ? 'Indica cómo se pagó para registrar la venta.'
+                    : 'Al entregar, selecciona el método de pago.'}
+                </p>
+
+                <select
+                  value={pedido.metodo_pago ?? ''}
+                  onChange={(e) =>
+                    actualizarCampo(
+                      'metodo_pago',
+                      e.target.value
+                    )
+                  }
+                  className={inputClass}
+                >
+                  <option value="">
+                    Seleccionar método...
+                  </option>
+                  {METODOS_PAGO.map((metodo) => (
+                    <option key={metodo} value={metodo}>
+                      {metodo}
+                    </option>
+                  ))}
+                  {pedido.metodo_pago &&
+                    !METODOS_PAGO.includes(
+                      pedido.metodo_pago as (typeof METODOS_PAGO)[number]
+                    ) && (
+                      <option
+                        value={pedido.metodo_pago}
+                      >
+                        {pedido.metodo_pago}
+                      </option>
+                    )}
+                </select>
+              </section>
+            </>
+          )}
 
           <hr />
 
@@ -646,13 +912,28 @@ export default function PedidoDetalle({
             <button
               type="button"
               onClick={guardarCambios}
-              disabled={guardando}
+              disabled={guardando || eliminando}
               className="w-full rounded-xl py-3 text-white font-semibold transition disabled:opacity-50"
               style={{ background: '#c6302c' }}
             >
               {guardando
                 ? 'Guardando...'
                 : 'Guardar cambios'}
+            </button>
+
+            <button
+              type="button"
+              onClick={eliminarPedidoAccion}
+              disabled={guardando || eliminando}
+              className="w-full rounded-xl py-3 font-semibold transition disabled:opacity-50 mt-3 border"
+              style={{
+                color: '#CF1322',
+                borderColor: '#FFA39E'
+              }}
+            >
+              {eliminando
+                ? 'Eliminando...'
+                : 'Eliminar pedido'}
             </button>
           </section>
 

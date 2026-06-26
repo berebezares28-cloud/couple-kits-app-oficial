@@ -4,41 +4,81 @@ import PedidosClient from './PedidosClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PedidosPage() {
-  const { data: pedidos } = await supabase
+type PedidoRow = {
+  id: string
+  nombre: string
+  instagram: string
+  lugar_entrega: string
+  fecha_entrega: string
+  hora_entrega: string
+  estatus: string
+  kits: string[]
+}
+
+async function pedidosConKits(
+  filtroEliminado: boolean
+): Promise<PedidoRow[]> {
+  const query = supabase
     .from('pedidos')
     .select('*')
     .order('created_at', { ascending: false })
 
-  const pedidoIds =
-    pedidos?.map((p) => p.id) ?? []
+  const { data: pedidos } = filtroEliminado
+    ? await query.eq('eliminado', true)
+    : await query.neq('eliminado', true)
 
-  const { data: pedidoKits } = await supabase
-    .from('pedido_kits')
-    .select(`
-      pedido_id,
-      kits (
-        nombre
-      )
-    `)
-    .in('pedido_id', pedidoIds)
+  const pedidoIds = pedidos?.map((p) => p.id) ?? []
 
-  const pedidosConKits =
+  let pedidoKits: {
+    pedido_id: string
+    kits: { nombre: string } | { nombre: string }[] | null
+  }[] = []
+
+  if (pedidoIds.length > 0) {
+    const { data } = await supabase
+      .from('pedido_kits')
+      .select(`
+        pedido_id,
+        kits (
+          nombre
+        )
+      `)
+      .in('pedido_id', pedidoIds)
+
+    pedidoKits = data ?? []
+  }
+
+  return (
     pedidos?.map((pedido) => ({
-      ...pedido,
+      id: pedido.id,
+      nombre: pedido.nombre ?? '',
+      instagram: pedido.instagram ?? '',
+      lugar_entrega: pedido.lugar_entrega ?? '',
+      fecha_entrega: pedido.fecha_entrega ?? '',
+      hora_entrega: pedido.hora_entrega ?? '',
+      estatus: pedido.estatus ?? 'Pendiente',
       kits:
         pedidoKits
-          ?.filter(
-            (pk: any) =>
-              pk.pedido_id === pedido.id
-          )
-          .map(
-            (pk: any) =>
-              (pk.kits as any)?.nombre
-          )
+          .filter((pk) => pk.pedido_id === pedido.id)
+          .map((pk) => {
+            const kit = pk.kits
+            if (Array.isArray(kit)) {
+              return kit[0]?.nombre
+            }
+            return kit?.nombre
+          })
           .filter(Boolean) ?? []
     })) ?? []
- 
+  )
+}
+
+export default async function PedidosPage() {
+  const [pedidosActivos, pedidosEliminados] =
+    await Promise.all([
+      pedidosConKits(false),
+      pedidosConKits(true)
+    ])
+
   return (
     <Suspense
       fallback={
@@ -50,7 +90,8 @@ export default async function PedidosPage() {
       }
     >
       <PedidosClient
-        pedidosIniciales={pedidosConKits}
+        pedidosIniciales={pedidosActivos}
+        pedidosEliminadosIniciales={pedidosEliminados}
       />
     </Suspense>
   )

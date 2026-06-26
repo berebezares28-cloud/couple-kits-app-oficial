@@ -25,6 +25,13 @@ const navItems = [
       path.startsWith('/insumos')
   },
   {
+    href: '/locales',
+    label: 'Locales',
+    icon: '🏪',
+    isActive: (path: string) =>
+      path.startsWith('/locales')
+  },
+  {
     href: '/finanzas',
     label: 'Finanzas',
     icon: '💰',

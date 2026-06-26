@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import { getSupabaseAdminOrError } from '../../../../scr/lib/supabase-admin'
+import { eliminarPedido } from '../../../../scr/lib/descontarInventario'
+import { supabase } from '../../../../scr/lib/supabase'
 
 const EDITABLE_FIELDS = [
   'estatus',
@@ -10,6 +10,9 @@ const EDITABLE_FIELDS = [
   'ocasion',
   'semillas',
   'nota',
+  'recibe_comision',
+  'porcentaje_comision',
+  'punto_entrega_id',
 ] as const
 
 export async function PATCH(
@@ -17,19 +20,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const admin = getSupabaseAdminOrError()
-
-    if ('error' in admin) {
-      return Response.json(
-        { error: admin.error },
-        { status: 500 }
-      )
-    }
-
-    const supabase = admin.client
     const body = await req.json()
 
-    const update: Record<string, string | null> = {}
+    const update: Record<string, string | number | boolean | null> = {}
 
     for (const field of EDITABLE_FIELDS) {
       if (field in body) {
@@ -62,6 +55,34 @@ export async function PATCH(
 
     return Response.json(
       { error: 'Error actualizando pedido' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const resultado = await eliminarPedido(
+      supabase,
+      params.id
+    )
+
+    if (!resultado.ok) {
+      return Response.json(
+        { error: resultado.error },
+        { status: 500 }
+      )
+    }
+
+    return Response.json({ success: true })
+  } catch (error) {
+    console.error(error)
+
+    return Response.json(
+      { error: 'Error eliminando pedido' },
       { status: 500 }
     )
   }

@@ -69,6 +69,9 @@ export default function InsumoDetalle({
   const [editCantidad, setEditCantidad] = useState('')
   const [editMonto, setEditMonto] = useState('')
   const [guardando, setGuardando] = useState(false)
+  const [eliminandoId, setEliminandoId] = useState<
+    string | null
+  >(null)
   const [mensaje, setMensaje] = useState<{
     tipo: 'ok' | 'error'
     texto: string
@@ -224,6 +227,75 @@ export default function InsumoDetalle({
     }
   }
 
+  async function eliminarCompra(compraId: string) {
+    const confirmar = window.confirm(
+      '¿Eliminar esta compra? Se restará del stock y del historial.'
+    )
+
+    if (!confirmar) return
+
+    setEliminandoId(compraId)
+    setMensaje(null)
+
+    try {
+      const res = await fetch(
+        `/api/insumos/compra/${compraId}?insumoId=${insumo.id}`,
+        { method: 'DELETE' }
+      )
+
+      let payload: {
+        error?: string
+        stock?: number
+        costoPromedio?: number | null
+      } = {}
+
+      try {
+        payload = await res.json()
+      } catch {
+        payload = {}
+      }
+
+      if (!res.ok) {
+        setMensaje({
+          tipo: 'error',
+          texto:
+            payload.error ||
+            'No se pudo eliminar la compra'
+        })
+        return
+      }
+
+      setCompras((prev) =>
+        prev.filter((c) => c.id !== compraId)
+      )
+
+      if (payload.stock != null) {
+        setStockActual(payload.stock)
+      }
+
+      if (payload.costoPromedio !== undefined) {
+        setCostoPromedio(payload.costoPromedio)
+      }
+
+      if (editandoId === compraId) {
+        cancelarEdicion()
+      }
+
+      setMensaje({
+        tipo: 'ok',
+        texto: 'Compra eliminada'
+      })
+      router.refresh()
+    } catch {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Error de conexión'
+      })
+    } finally {
+      setEliminandoId(null)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#fafafa]">
       <div className="max-w-md mx-auto px-5 pt-8 pb-24">
@@ -324,8 +396,7 @@ export default function InsumoDetalle({
               Historial de compras
             </h2>
             <p className="text-sm text-gray-500 mb-4">
-              Toca editar para corregir cantidad o
-              precio
+              Edita o elimina entradas del historial
             </p>
 
             {mensaje && (
@@ -478,15 +549,40 @@ export default function InsumoDetalle({
                             </p>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              iniciarEdicion(compra)
-                            }
-                            className="mt-3 text-sm text-gray-500 underline"
-                          >
-                            Editar
-                          </button>
+                          <div className="mt-3 flex gap-4">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                iniciarEdicion(compra)
+                              }
+                              disabled={
+                                eliminandoId ===
+                                compra.id
+                              }
+                              className="text-sm text-gray-500 underline disabled:opacity-50"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                eliminarCompra(
+                                  compra.id
+                                )
+                              }
+                              disabled={
+                                eliminandoId ===
+                                compra.id
+                              }
+                              className="text-sm underline disabled:opacity-50"
+                              style={{ color: '#CF1322' }}
+                            >
+                              {eliminandoId ===
+                              compra.id
+                                ? 'Eliminando...'
+                                : 'Eliminar'}
+                            </button>
+                          </div>
                         </>
                       )}
                     </li>

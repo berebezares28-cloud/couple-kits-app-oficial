@@ -1,5 +1,9 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import { calcularConsumoDesdeKits } from './descontarInventario'
+import { esEntregaEnLocal } from './puntosEntrega'
+import {
+  consumoInsumosPorPedido,
+  pedidoActivo
+} from './pedidoSnapshots'
 
 export type InsumoConStock = {
   id: string
@@ -132,36 +136,33 @@ async function sumarConsumoEntregados(
 
   const { data: pedidos } = await supabase
     .from('pedidos')
-    .select('id')
+    .select('id, punto_entrega_id, eliminado')
     .eq('estatus', 'Entregado')
+    .neq('eliminado', true)
 
-  if (!pedidos?.length) {
+  const pedidosDirectos =
+    pedidos?.filter(
+      (p) => !esEntregaEnLocal(p) && pedidoActivo(p)
+    ) ?? []
+
+  if (!pedidosDirectos.length) {
     return consumo
   }
 
-  const pedidoIds = pedidos.map((p) => p.id)
-
-  const { data: pedidoKits } = await supabase
-    .from('pedido_kits')
-    .select('kit_id, cantidad')
-    .in('pedido_id', pedidoIds)
-
-  if (!pedidoKits?.length) {
-    return consumo
-  }
-
-  const resultado =
-    await calcularConsumoDesdeKits(
+  for (const pedido of pedidosDirectos) {
+    const consumoPedido = await consumoInsumosPorPedido(
       supabase,
-      pedidoKits
+      pedido.id
     )
 
-  if (!resultado.ok) {
-    return consumo
-  }
-
-  for (const linea of resultado.lineas) {
-    consumo.set(linea.insumoId, linea.cantidad)
+    for (const [insumoId, cantidad] of Array.from(
+      consumoPedido.entries()
+    )) {
+      consumo.set(
+        insumoId,
+        (consumo.get(insumoId) ?? 0) + cantidad
+      )
+    }
   }
 
   return consumo
@@ -194,37 +195,29 @@ export async function calcularStockPorInsumo(
 
   const { data: pedidos } = await supabase
     .from('pedidos')
-    .select('id')
+    .select('id, punto_entrega_id, eliminado')
     .eq('estatus', 'Entregado')
+    .neq('eliminado', true)
 
-  if (!pedidos?.length) {
+  const pedidosDirectos =
+    pedidos?.filter(
+      (p) => !esEntregaEnLocal(p) && pedidoActivo(p)
+    ) ?? []
+
+  if (!pedidosDirectos.length) {
     return entradas
   }
 
-  const pedidoIds = pedidos.map((p) => p.id)
+  let consumido = 0
 
-  const { data: pedidoKits } = await supabase
-    .from('pedido_kits')
-    .select('kit_id, cantidad')
-    .in('pedido_id', pedidoIds)
+  for (const pedido of pedidosDirectos) {
+    const consumoPedido = await consumoInsumosPorPedido(
+      supabase,
+      pedido.id
+    )
 
-  if (!pedidoKits?.length) {
-    return entradas
+    consumido += consumoPedido.get(insumoId) ?? 0
   }
-
-  const resultado = await calcularConsumoDesdeKits(
-    supabase,
-    pedidoKits
-  )
-
-  if (!resultado.ok) {
-    return entradas
-  }
-
-  const consumido =
-    resultado.lineas.find(
-      (linea) => linea.insumoId === insumoId
-    )?.cantidad ?? 0
 
   return entradas - consumido
 }
@@ -419,25 +412,77 @@ export async function actualizarCompraInsumo(
   return { ok: true }
 }
 
+export async function eliminarCompraInsumo(
+  supabase: SupabaseClient,
+  compraId: string,
+  insumoId: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: compra, error: fetchError } =
+    await supabase
+      .from('compras_insumos')
+      .select('id, insumo_id')
+      .eq('id', compraId)
+      .single()
+
+  if (fetchError || !compra) {
+    return {
+      ok: false,
+      error: fetchError?.message ?? 'Compra no encontrada'
+    }
+  }
+
+  if (compra.insumo_id !== insumoId) {
+    return {
+      ok: false,
+      error: 'La compra no pertenece a este insumo'
+    }
+  }
+
+  const { error } = await supabase
+    .from('compras_insumos')
+    .delete()
+    .eq('id', compraId)
+
+  if (error) {
+    return { ok: false, error: error.message }
+  }
+
+  await sincronizarCostoPromedioInsumo(
+    supabase,
+    insumoId
+  )
+
+  return { ok: true }
+}
+
 export async function obtenerHistorialConsumoPedidos(
   supabase: SupabaseClient,
   insumoId: string
 ): Promise<ConsumoPedidoEntregado[]> {
   const { data: pedidos } = await supabase
     .from('pedidos')
-    .select('id, nombre, instagram, fecha_entrega')
+    .select(
+      'id, nombre, instagram, fecha_entrega, punto_entrega_id, eliminado'
+    )
     .eq('estatus', 'Entregado')
+    .neq('eliminado', true)
     .order('fecha_entrega', { ascending: false })
 
-  if (!pedidos?.length) {
+  const pedidosDirectos =
+    pedidos?.filter(
+      (p) => !esEntregaEnLocal(p) && pedidoActivo(p)
+    ) ?? []
+
+  if (!pedidosDirectos.length) {
     return []
   }
 
-  const pedidoIds = pedidos.map((p) => p.id)
+  const pedidoIds = pedidosDirectos.map((p) => p.id)
 
   const { data: pedidoKits } = await supabase
     .from('pedido_kits')
     .select(`
+      id,
       pedido_id,
       kit_id,
       cantidad,
@@ -451,32 +496,28 @@ export async function obtenerHistorialConsumoPedidos(
     return []
   }
 
-  const kitIds = Array.from(
-    new Set(
-      pedidoKits.map((pk) => pk.kit_id).filter(Boolean)
-    )
-  )
+  const pedidoKitIds = pedidoKits.map((pk) => pk.id)
 
-  const { data: recetas } = await supabase
-    .from('recetas_kit')
-    .select('kit_id, cantidad')
+  const { data: snapshots } = await supabase
+    .from('pedido_kit_receta')
+    .select('pedido_kit_id, cantidad')
     .eq('insumo_id', insumoId)
-    .in('kit_id', kitIds)
+    .in('pedido_kit_id', pedidoKitIds)
 
-  if (!recetas?.length) {
+  if (!snapshots?.length) {
     return []
   }
 
-  const recetaPorKit = new Map(
-    recetas.map((r) => [
-      r.kit_id,
-      Number(r.cantidad)
+  const recetaPorPedidoKit = new Map(
+    snapshots.map((s) => [
+      s.pedido_kit_id,
+      Number(s.cantidad)
     ])
   )
 
   const historial: ConsumoPedidoEntregado[] = []
 
-  for (const pedido of pedidos) {
+  for (const pedido of pedidosDirectos) {
     const kitsDelPedido = pedidoKits.filter(
       (pk) => pk.pedido_id === pedido.id
     )
@@ -486,7 +527,7 @@ export async function obtenerHistorialConsumoPedidos(
     let cantidadTotal = 0
 
     for (const pk of kitsDelPedido) {
-      const porUnidad = recetaPorKit.get(pk.kit_id)
+      const porUnidad = recetaPorPedidoKit.get(pk.id)
 
       if (!porUnidad) continue
 

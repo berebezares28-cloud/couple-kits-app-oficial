@@ -14,13 +14,29 @@ type Insumo = {
   stock_actual: number
 }
 
+type KitOpcion = {
+  id: string
+  nombre: string
+}
+
 const inputClass =
   'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-black transition'
 
+function kitsAsignadosVacios(kits: KitOpcion[]) {
+  return Object.fromEntries(
+    kits.map((kit) => [
+      kit.id,
+      { activo: false, cantidad: '1' }
+    ])
+  )
+}
+
 export default function CompraClient({
-  insumos: insumosIniciales
+  insumos: insumosIniciales,
+  kits: kitsIniciales = []
 }: {
   insumos: Insumo[]
+  kits?: KitOpcion[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -42,6 +58,12 @@ export default function CompraClient({
   const [stockInicial, setStockInicial] = useState('')
   const [montoInicial, setMontoInicial] = useState('')
   const [stockMinimo, setStockMinimo] = useState('0')
+  const [kits, setKits] = useState<KitOpcion[]>(
+    kitsIniciales
+  )
+  const [kitsAsignados, setKitsAsignados] = useState<
+    Record<string, { activo: boolean; cantidad: string }>
+  >(() => kitsAsignadosVacios(kitsIniciales))
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<{
     tipo: 'ok' | 'error'
@@ -58,6 +80,32 @@ export default function CompraClient({
 
     cargar()
   }, [])
+
+  useEffect(() => {
+    if (kitsIniciales.length > 0) {
+      setKits(kitsIniciales)
+      setKitsAsignados(kitsAsignadosVacios(kitsIniciales))
+      return
+    }
+
+    async function cargarKits() {
+      const res = await fetch('/api/kits')
+      if (!res.ok) return
+
+      const data = await res.json()
+      const lista: KitOpcion[] = Array.isArray(data)
+        ? data.map((k: { id: string; nombre: string }) => ({
+            id: k.id,
+            nombre: k.nombre ?? 'Kit'
+          }))
+        : []
+
+      setKits(lista)
+      setKitsAsignados(kitsAsignadosVacios(lista))
+    }
+
+    cargarKits()
+  }, [kitsIniciales])
 
   useEffect(() => {
     const preseleccion =
@@ -191,6 +239,15 @@ export default function CompraClient({
     setGuardando(true)
     setMensaje(null)
 
+    const asignaciones_kits = kits
+      .filter((kit) => kitsAsignados[kit.id]?.activo)
+      .map((kit) => ({
+        kit_id: kit.id,
+        cantidad:
+          Number(kitsAsignados[kit.id]?.cantidad) || 0
+      }))
+      .filter((a) => a.cantidad > 0)
+
     const res = await fetch('/api/insumos/nuevo', {
       method: 'POST',
       headers: {
@@ -206,7 +263,8 @@ export default function CompraClient({
         stock_inicial: Number(stockInicial) || 0,
         monto_inicial: montoInicial
           ? Number(montoInicial)
-          : null
+          : null,
+        asignaciones_kits
       })
     })
 
@@ -223,7 +281,9 @@ export default function CompraClient({
 
     setMensaje({
       tipo: 'ok',
-      texto: `Insumo "${payload.insumo.nombre}" creado`
+      texto: asignaciones_kits.length
+        ? `Insumo "${payload.insumo.nombre}" creado y agregado a ${asignaciones_kits.length} kit(s). Solo aplica a pedidos nuevos.`
+        : `Insumo "${payload.insumo.nombre}" creado`
     })
 
     setNombre('')
@@ -234,6 +294,7 @@ export default function CompraClient({
     setStockInicial('')
     setMontoInicial('')
     setStockMinimo('0')
+    setKitsAsignados(kitsAsignadosVacios(kits))
     router.refresh()
   }
 
@@ -495,6 +556,87 @@ export default function CompraClient({
                   }
                   className={inputClass}
                 />
+              </div>
+
+              <hr />
+
+              <div className="space-y-3">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Agregar a recetas de kits (opcional)
+                </p>
+                <p className="text-xs text-gray-500">
+                  Solo afecta pedidos creados después de
+                  hoy. Los pedidos anteriores conservan su
+                  receta congelada.
+                </p>
+
+                {kits.length === 0 ? (
+                  <p className="text-sm text-gray-400">
+                    No hay kits activos
+                  </p>
+                ) : (
+                  kits.map((kit) => {
+                    const asignacion =
+                      kitsAsignados[kit.id] ?? {
+                        activo: false,
+                        cantidad: '1'
+                      }
+
+                    return (
+                      <div
+                        key={kit.id}
+                        className="rounded-xl border border-gray-100 px-4 py-3"
+                      >
+                        <label className="flex items-center gap-3 text-sm font-medium">
+                          <input
+                            type="checkbox"
+                            checked={asignacion.activo}
+                            onChange={(e) =>
+                              setKitsAsignados(
+                                (prev) => ({
+                                  ...prev,
+                                  [kit.id]: {
+                                    ...asignacion,
+                                    activo:
+                                      e.target.checked
+                                  }
+                                })
+                              )
+                            }
+                          />
+                          {kit.nombre}
+                        </label>
+
+                        {asignacion.activo && (
+                          <div className="mt-3">
+                            <label className="text-xs text-gray-500 mb-1 block">
+                              Cantidad por kit
+                            </label>
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={asignacion.cantidad}
+                              onChange={(e) =>
+                                setKitsAsignados(
+                                  (prev) => ({
+                                    ...prev,
+                                    [kit.id]: {
+                                      ...asignacion,
+                                      cantidad:
+                                        e.target.value
+                                    }
+                                  })
+                                )
+                              }
+                              className={inputClass}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
               <hr />

@@ -45,9 +45,11 @@ function getStatusStyle(status: string) {
 }
 
 export default function PedidosClient({
-  pedidosIniciales
+  pedidosIniciales,
+  pedidosEliminadosIniciales = []
 }: {
   pedidosIniciales: Pedido[]
+  pedidosEliminadosIniciales?: Pedido[]
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -67,70 +69,121 @@ export default function PedidosClient({
   const [pedidos, setPedidos] =
     useState(pedidosIniciales)
 
+  const [pedidosEliminados, setPedidosEliminados] =
+    useState(pedidosEliminadosIniciales)
+
+  const [eliminadosAbierto, setEliminadosAbierto] =
+    useState(false)
+
+  const [restaurandoId, setRestaurandoId] =
+    useState<string | null>(null)
+
+  async function mapearPedidosConKits(
+    lista: {
+      id: string
+      nombre: string
+      instagram: string
+      lugar_entrega: string
+      fecha_entrega: string
+      hora_entrega: string
+      estatus: string
+    }[]
+  ): Promise<Pedido[]> {
+    if (!lista.length) return []
+
+    const pedidoIds = lista.map((p) => p.id)
+
+    const { data: pedidoKits } = await supabase
+      .from('pedido_kits')
+      .select(`
+        pedido_id,
+        kits (
+          nombre
+        )
+      `)
+      .in('pedido_id', pedidoIds)
+
+    return lista.map((pedido) => ({
+      id: pedido.id,
+      nombre: pedido.nombre,
+      instagram: pedido.instagram,
+      lugar_entrega: pedido.lugar_entrega,
+      fecha_entrega: pedido.fecha_entrega,
+      hora_entrega: pedido.hora_entrega,
+      estatus: pedido.estatus,
+      kits:
+        (pedidoKits ?? [])
+          .filter((pk) => pk.pedido_id === pedido.id)
+          .map((pk) => {
+            const kit = pk.kits
+            if (Array.isArray(kit)) {
+              return kit[0]?.nombre
+            }
+            return kit?.nombre
+          })
+          .filter((nombre): nombre is string =>
+            Boolean(nombre)
+          )
+    }))
+  }
+
   async function cargarPedidos() {
     try {
       const { data: lista, error } = await supabase
         .from('pedidos')
         .select('*')
+        .neq('eliminado', true)
         .order('created_at', { ascending: false })
 
       if (error || !lista) return
 
-      const pedidoIds = lista.map((p) => p.id)
-
-      let pedidoKits: {
-        pedido_id: string
-        kits: { nombre: string } | { nombre: string }[] | null
-      }[] = []
-
-      if (pedidoIds.length > 0) {
-        const { data } = await supabase
-          .from('pedido_kits')
-          .select(`
-            pedido_id,
-            kits (
-              nombre
-            )
-          `)
-          .in('pedido_id', pedidoIds)
-
-        pedidoKits = data ?? []
-      }
-
-      const pedidosConKits = lista.map((pedido) => ({
-        id: pedido.id,
-        nombre: pedido.nombre,
-        instagram: pedido.instagram,
-        lugar_entrega: pedido.lugar_entrega,
-        fecha_entrega: pedido.fecha_entrega,
-        hora_entrega: pedido.hora_entrega,
-        estatus: pedido.estatus,
-        kits:
-          pedidoKits
-            .filter((pk) => pk.pedido_id === pedido.id)
-            .map((pk) => {
-              const kit = pk.kits
-              if (Array.isArray(kit)) {
-                return kit[0]?.nombre
-              }
-              return kit?.nombre
-            })
-            .filter((nombre): nombre is string =>
-              Boolean(nombre)
-            )
-      }))
-
-      setPedidos(pedidosConKits)
+      setPedidos(await mapearPedidosConKits(lista))
     } catch (error) {
       console.error('Error cargando pedidos', error)
     }
   }
 
+  async function cargarPedidosEliminados() {
+    try {
+      const { data: lista, error } = await supabase
+        .from('pedidos')
+        .select('*')
+        .eq('eliminado', true)
+        .order('created_at', { ascending: false })
+
+      if (error || !lista) return
+
+      setPedidosEliminados(
+        await mapearPedidosConKits(lista)
+      )
+    } catch (error) {
+      console.error(
+        'Error cargando pedidos eliminados',
+        error
+      )
+    }
+  }
+
+  async function cargarTodo() {
+    await Promise.all([
+      cargarPedidos(),
+      cargarPedidosEliminados()
+    ])
+  }
+
   useEffect(() => {
     if (pathname === '/pedidos') {
-      cargarPedidos()
+      cargarTodo()
     }
   }, [pathname])
+
+  useEffect(() => {
+    setPedidos(pedidosIniciales)
+  }, [pedidosIniciales])
+
+  useEffect(() => {
+    setPedidosEliminados(pedidosEliminadosIniciales)
+  }, [pedidosEliminadosIniciales])
 
   useEffect(() => {
     const estatus = searchParams.get('estatus')
@@ -172,7 +225,7 @@ export default function PedidosClient({
 
     return pedidos.filter((pedido) => {
       const kits =
-        pedido.kits.join(' ')
+        (pedido.kits ?? []).join(' ')
 
       const coincideBusqueda =
         pedido.nombre
@@ -208,12 +261,16 @@ export default function PedidosClient({
               pedido.fecha_entrega ===
               mananaString
           } else if (filtroFecha === 'Esta semana') {
-            const fechaPedido =
-              new Date(pedido.fecha_entrega)
-          
-            coincideFecha =
-              fechaPedido >= hoy &&
-              fechaPedido <= dentroDe7Dias
+            if (!pedido.fecha_entrega) {
+              coincideFecha = false
+            } else {
+              const fechaPedido =
+                new Date(pedido.fecha_entrega)
+
+              coincideFecha =
+                fechaPedido >= hoy &&
+                fechaPedido <= dentroDe7Dias
+            }
           }
 
       return (
@@ -257,6 +314,36 @@ export default function PedidosClient({
     )
   }
 
+  async function restaurarPedido(pedidoId: string) {
+    const confirmar = window.confirm(
+      '¿Restaurar este pedido? Volverá a aparecer en la lista y, si estaba entregado, contará de nuevo en ventas e inventario.'
+    )
+
+    if (!confirmar) return
+
+    setRestaurandoId(pedidoId)
+
+    try {
+      const res = await fetch(
+        `/api/pedidos/${pedidoId}/restaurar`,
+        { method: 'POST' }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || 'No se pudo restaurar')
+        return
+      }
+
+      await cargarTodo()
+    } catch {
+      alert('Error de conexión')
+    } finally {
+      setRestaurandoId(null)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-white">
       <div className="max-w-md mx-auto px-5 pb-24">
@@ -281,7 +368,7 @@ export default function PedidosClient({
               color: '#888'
             }}
           >
-            Studio
+            estudio
           </p>
 
         </div>
@@ -502,6 +589,95 @@ export default function PedidosClient({
             )
           }
         )}
+
+        <div className="mt-10 border-t border-gray-100 pt-8">
+          <button
+            type="button"
+            onClick={() =>
+              setEliminadosAbierto((v) => !v)
+            }
+            className="w-full flex items-center justify-between text-left"
+          >
+            <div>
+              <p
+                style={{
+                  fontSize: '0.72rem',
+                  letterSpacing: '0.25em',
+                  textTransform: 'uppercase',
+                  color: '#888'
+                }}
+              >
+                Pedidos eliminados
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {pedidosEliminados.length} pedido
+                {pedidosEliminados.length === 1
+                  ? ''
+                  : 's'}
+              </p>
+            </div>
+            <span className="text-gray-400 text-lg">
+              {eliminadosAbierto ? '−' : '+'}
+            </span>
+          </button>
+
+          {eliminadosAbierto && (
+            <div className="mt-4 space-y-4">
+              {pedidosEliminados.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  No hay pedidos eliminados
+                </p>
+              ) : (
+                pedidosEliminados.map((pedido) => (
+                  <div
+                    key={pedido.id}
+                    className="editorial-card opacity-80"
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div>
+                        <p className="customer-name">
+                          {pedido.nombre}
+                        </p>
+                        <p className="customer-instagram">
+                          @{pedido.instagram}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          {pedido.estatus} ·{' '}
+                          {pedido.fecha_entrega ||
+                            'Sin fecha'}
+                        </p>
+                        {pedido.kits.length > 0 && (
+                          <p className="text-sm text-gray-600 mt-2">
+                            🎨 {pedido.kits.join(', ')}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          restaurarPedido(pedido.id)
+                        }
+                        disabled={
+                          restaurandoId === pedido.id
+                        }
+                        className="shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border disabled:opacity-50"
+                        style={{
+                          color: '#389E0D',
+                          borderColor: '#B7EB8F'
+                        }}
+                      >
+                        {restaurandoId === pedido.id
+                          ? '...'
+                          : 'Restaurar'}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
       </div>
     </main>
