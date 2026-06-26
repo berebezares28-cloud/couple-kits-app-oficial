@@ -513,7 +513,10 @@ export async function eliminarPedido(
 
   const { error } = await supabase
     .from('pedidos')
-    .update({ eliminado: true })
+    .update({
+      eliminado: true,
+      eliminado_at: new Date().toISOString()
+    })
     .eq('id', pedidoId)
 
   if (error) {
@@ -549,7 +552,10 @@ export async function restaurarPedido(
 
   const { error } = await supabase
     .from('pedidos')
-    .update({ eliminado: false })
+    .update({
+      eliminado: false,
+      eliminado_at: null
+    })
     .eq('id', pedidoId)
 
   if (error) {

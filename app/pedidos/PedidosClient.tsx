@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { supabase } from '../../scr/lib/supabase'
+import {
+  DIAS_RETENCION_PEDIDOS_ELIMINADOS,
+  diasRestantesParaPurga
+} from '../../scr/lib/pedidosEliminados'
 
 type Pedido = {
   id: string
@@ -14,6 +18,7 @@ type Pedido = {
   hora_entrega: string
   estatus: string
   kits: string[]
+  eliminado_at?: string | null
 }
 
 function getStatusStyle(status: string) {
@@ -87,6 +92,7 @@ export default function PedidosClient({
       fecha_entrega: string
       hora_entrega: string
       estatus: string
+      eliminado_at?: string | null
     }[]
   ): Promise<Pedido[]> {
     if (!lista.length) return []
@@ -111,6 +117,7 @@ export default function PedidosClient({
       fecha_entrega: pedido.fecha_entrega,
       hora_entrega: pedido.hora_entrega,
       estatus: pedido.estatus,
+      eliminado_at: pedido.eliminado_at ?? null,
       kits: (pedidoKits ?? [])
         .filter((pk) => pk.pedido_id === pedido.id)
         .flatMap((pk) => {
@@ -614,6 +621,8 @@ export default function PedidosClient({
                 {pedidosEliminados.length === 1
                   ? ''
                   : 's'}
+                · se borran solos a los{' '}
+                {DIAS_RETENCION_PEDIDOS_ELIMINADOS} días
               </p>
             </div>
             <span className="text-gray-400 text-lg">
@@ -649,6 +658,21 @@ export default function PedidosClient({
                         {pedido.kits.length > 0 && (
                           <p className="text-sm text-gray-600 mt-2">
                             🎨 {pedido.kits.join(', ')}
+                          </p>
+                        )}
+                        {pedido.eliminado_at && (
+                          <p className="text-xs text-amber-700 mt-2">
+                            {(() => {
+                              const dias =
+                                diasRestantesParaPurga(
+                                  pedido.eliminado_at
+                                )
+                              if (dias === null) return null
+                              if (dias === 0) {
+                                return 'Se eliminará permanentemente hoy'
+                              }
+                              return `Quedan ${dias} día${dias === 1 ? '' : 's'} para restaurar`
+                            })()}
                           </p>
                         )}
                       </div>

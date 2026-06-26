@@ -13,6 +13,7 @@ type PedidoRow = {
   hora_entrega: string
   estatus: string
   kits: string[]
+  eliminado_at?: string | null
 }
 
 async function pedidosConKits(
@@ -57,6 +58,9 @@ async function pedidosConKits(
       fecha_entrega: pedido.fecha_entrega ?? '',
       hora_entrega: pedido.hora_entrega ?? '',
       estatus: pedido.estatus ?? 'Pendiente',
+      eliminado_at: filtroEliminado
+        ? pedido.eliminado_at ?? null
+        : undefined,
       kits: pedidoKits
         .filter((pk) => pk.pedido_id === pedido.id)
         .flatMap((pk) => {
