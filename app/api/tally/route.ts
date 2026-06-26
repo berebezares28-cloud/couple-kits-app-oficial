@@ -29,9 +29,13 @@ function getMultiSelectTexts(field: any) {
     return []
   }
 
+  const values = Array.isArray(field.value)
+    ? field.value
+    : [field.value]
+
   return field.options
     .filter((option: any) =>
-      field.value.includes(option.id)
+      values.includes(option.id)
     )
     .map((option: any) => option.text)
 }
@@ -54,9 +58,13 @@ export async function POST(req: Request) {
       getField(fields, '¿Para quién es el kit?')
     )
 
-    const semillas = getDropdownText(
+    const semillasSeleccionadas = getMultiSelectTexts(
       getField(fields, 'Semillas')
     )
+    const semillas =
+      semillasSeleccionadas.length > 0
+        ? semillasSeleccionadas.join(', ')
+        : getDropdownText(getField(fields, 'Semillas'))
 
     const nota =
       getField(fields, 'Nota')?.value ?? null
