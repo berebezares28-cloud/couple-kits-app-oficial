@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import InformePerformance from './InformePerformance'
 import CalendarioContenido from './CalendarioContenido'
 import CalendarioFeedGrid from './CalendarioFeedGrid'
 import {
@@ -30,7 +31,7 @@ import {
 const inputClass =
   'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-black'
 
-type VistaContenido = 'feed' | 'lista' | 'calendario'
+type VistaContenido = 'feed' | 'lista' | 'calendario' | 'informe'
 
 type FiltroContenido =
   | 'todos'
@@ -733,19 +734,20 @@ export default function ContenidoClient({
           publicar
         </p>
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
           {(
             [
               ['feed', 'Feed'],
               ['lista', 'Lista'],
-              ['calendario', 'Calendario']
+              ['calendario', 'Calendario'],
+              ['informe', 'Informe']
             ] as const
           ).map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setVista(id)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold border transition"
+              className="flex-1 min-w-[4.5rem] py-2.5 rounded-xl text-sm font-semibold border transition whitespace-nowrap"
               style={{
                 background: vista === id ? '#111' : '#fff',
                 color: vista === id ? '#fff' : '#111'
@@ -843,6 +845,13 @@ export default function ContenidoClient({
 
         {vista === 'calendario' && (
           <CalendarioContenido
+            publicaciones={publicaciones}
+            onSeleccionar={cargarEnFormulario}
+          />
+        )}
+
+        {vista === 'informe' && (
+          <InformePerformance
             publicaciones={publicaciones}
             onSeleccionar={cargarEnFormulario}
           />
