@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { insertarPedidoKitsConSnapshot } from '../../../scr/lib/pedidoSnapshots'
+import {
+  buscarPuntoEntregaPorLugar,
+  listarPuntosEntrega
+} from '../../../scr/lib/puntosEntrega'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -83,6 +87,12 @@ export async function POST(req: Request) {
       getField(fields, '¿Cuál es tu kit?')
     )
 
+    const puntosEntrega = await listarPuntosEntrega(supabase)
+    const puntoLocal = buscarPuntoEntregaPorLugar(
+      lugarEntrega,
+      puntosEntrega
+    )
+
     const { data: pedidoCreado, error } = await supabase
       .from('pedidos')
       .insert({
@@ -95,6 +105,7 @@ export async function POST(req: Request) {
         lugar_entrega: lugarEntrega,
         fecha_entrega: fechaEntrega,
         hora_entrega: horaEntrega,
+        punto_entrega_id: puntoLocal?.id ?? null,
         estatus: 'Pendiente'
       })
       .select()

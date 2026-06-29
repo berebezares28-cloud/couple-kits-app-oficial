@@ -37,6 +37,64 @@ export function esEntregaEnLocal(pedido: {
   return Boolean(pedido.punto_entrega_id)
 }
 
+function normalizarNombreLugar(
+  valor: string | null | undefined
+): string | null {
+  const normalizado = valor?.trim().toLocaleLowerCase('es')
+  return normalizado ? normalizado : null
+}
+
+export function buscarPuntoEntregaPorLugar(
+  lugar: string | null | undefined,
+  puntos: Pick<PuntoEntrega, 'id' | 'nombre'>[]
+): Pick<PuntoEntrega, 'id' | 'nombre'> | null {
+  const lugarNormalizado = normalizarNombreLugar(lugar)
+  if (!lugarNormalizado) return null
+
+  return (
+    puntos.find(
+      (punto) =>
+        normalizarNombreLugar(punto.nombre) ===
+        lugarNormalizado
+    ) ?? null
+  )
+}
+
+export function inferirEntregaDesdePedido(
+  pedido: {
+    punto_entrega_id?: string | null
+    lugar_entrega?: string | null
+  },
+  puntos: Pick<PuntoEntrega, 'id' | 'nombre'>[]
+): {
+  tipo: 'directa' | 'local'
+  punto_entrega_id: string | null
+} {
+  if (pedido.punto_entrega_id) {
+    return {
+      tipo: 'local',
+      punto_entrega_id: pedido.punto_entrega_id
+    }
+  }
+
+  const punto = buscarPuntoEntregaPorLugar(
+    pedido.lugar_entrega,
+    puntos
+  )
+
+  if (punto) {
+    return {
+      tipo: 'local',
+      punto_entrega_id: punto.id
+    }
+  }
+
+  return {
+    tipo: 'directa',
+    punto_entrega_id: null
+  }
+}
+
 export type EstadisticasComision = {
   totalIngresos: number
   totalComision: number

@@ -8,6 +8,7 @@ import {
   obtenerConsumoDesdeKits,
   syncPedidoKits
 } from '../../../scr/lib/descontarInventario'
+import { inferirEntregaDesdePedido } from '../../../scr/lib/puntosEntrega'
 
 type Pedido = {
   id: string
@@ -112,7 +113,17 @@ export default function PedidoDetalle({
   kitsDisponibles: KitDisponible[]
   puntosEntrega: PuntoEntrega[]
 }) {
-  const [pedido, setPedido] = useState(pedidoInicial)
+  const entregaInicial = inferirEntregaDesdePedido(
+    pedidoInicial,
+    puntosEntrega
+  )
+
+  const [pedido, setPedido] = useState({
+    ...pedidoInicial,
+    punto_entrega_id:
+      entregaInicial.punto_entrega_id ??
+      pedidoInicial.punto_entrega_id
+  })
   const [kitsPedido, setKitsPedido] =
     useState(kitsIniciales)
   const [kitSeleccionado, setKitSeleccionado] =
@@ -127,9 +138,7 @@ export default function PedidoDetalle({
   } | null>(null)
   const [tipoEntrega, setTipoEntrega] = useState<
     'directa' | 'local'
-  >(
-    pedidoInicial.punto_entrega_id ? 'local' : 'directa'
-  )
+  >(entregaInicial.tipo)
 
   const router = useRouter()
 
@@ -148,7 +157,18 @@ export default function PedidoDetalle({
         .single()
 
       if (pedidoDb) {
-        setPedido(pedidoDb)
+        const entrega = inferirEntregaDesdePedido(
+          pedidoDb,
+          puntosEntrega
+        )
+
+        setPedido({
+          ...pedidoDb,
+          punto_entrega_id:
+            entrega.punto_entrega_id ??
+            pedidoDb.punto_entrega_id
+        })
+        setTipoEntrega(entrega.tipo)
       }
 
       const { data: pedidoKits } = await supabase

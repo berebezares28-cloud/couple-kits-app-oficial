@@ -2,10 +2,19 @@ import { SupabaseClient } from '@supabase/supabase-js'
 
 export type TipoContenido = 'organico' | 'anuncio_pagado'
 
+export type FormatoContenido =
+  | 'reel'
+  | 'carrusel'
+  | 'foto'
+  | 'story'
+  | 'otro'
+
 export type PublicacionContenido = {
   id: string
   fecha: string
   tipo: TipoContenido
+  formato: FormatoContenido
+  publicado: boolean
   plataforma: string
   titulo: string
   notas: string | null
@@ -20,8 +29,16 @@ export type PublicacionContenido = {
 }
 
 export const TIPOS_CONTENIDO = [
-  { value: 'organico', label: 'Contenido publicado' },
+  { value: 'organico', label: 'Orgánico' },
   { value: 'anuncio_pagado', label: 'Anuncio pagado' }
+] as const
+
+export const FORMATOS_CONTENIDO = [
+  { value: 'reel', label: 'Reel', emoji: '🎬' },
+  { value: 'carrusel', label: 'Carrusel', emoji: '🖼️' },
+  { value: 'foto', label: 'Foto', emoji: '📷' },
+  { value: 'story', label: 'Story', emoji: '⭕' },
+  { value: 'otro', label: 'Otro', emoji: '📝' }
 ] as const
 
 export const PLATAFORMAS_CONTENIDO = [
@@ -31,11 +48,41 @@ export const PLATAFORMAS_CONTENIDO = [
   'Otro'
 ] as const
 
+export function emojiFormato(
+  formato: FormatoContenido
+): string {
+  return (
+    FORMATOS_CONTENIDO.find((f) => f.value === formato)
+      ?.emoji ?? '📝'
+  )
+}
+
+function parseFormato(
+  valor: unknown
+): FormatoContenido {
+  const formatos: FormatoContenido[] = [
+    'reel',
+    'carrusel',
+    'foto',
+    'story',
+    'otro'
+  ]
+  if (
+    typeof valor === 'string' &&
+    formatos.includes(valor as FormatoContenido)
+  ) {
+    return valor as FormatoContenido
+  }
+  return 'reel'
+}
+
 function mapPublicacion(row: Record<string, unknown>): PublicacionContenido {
   return {
     id: String(row.id),
     fecha: String(row.fecha).slice(0, 10),
     tipo: row.tipo as TipoContenido,
+    formato: parseFormato(row.formato),
+    publicado: row.publicado !== false,
     plataforma: String(row.plataforma ?? 'instagram'),
     titulo: String(row.titulo ?? ''),
     notas: row.notas != null ? String(row.notas) : null,
@@ -78,6 +125,8 @@ export async function crearPublicacionContenido(
   params: {
     fecha: string
     tipo: TipoContenido
+    formato?: FormatoContenido
+    publicado?: boolean
     plataforma: string
     titulo: string
     notas?: string | null
@@ -93,21 +142,32 @@ export async function crearPublicacionContenido(
   | { ok: true; publicacion: PublicacionContenido }
   | { ok: false; error: string }
 > {
+  const publicado = params.publicado ?? true
+
   const { data, error } = await supabase
     .from('contenido_publicaciones')
     .insert({
       fecha: params.fecha,
       tipo: params.tipo,
+      formato: params.formato ?? 'reel',
+      publicado,
       plataforma: params.plataforma.trim(),
       titulo: params.titulo.trim(),
       notas: params.notas?.trim() || null,
-      alcance: params.alcance ?? null,
-      likes: params.likes ?? null,
-      comentarios: params.comentarios ?? null,
-      clics: params.clics ?? null,
-      ventas_atribuidas: params.ventas_atribuidas ?? null,
-      monto_anuncio: params.monto_anuncio ?? null,
-      url: params.url?.trim() || null
+      alcance: publicado ? (params.alcance ?? null) : null,
+      likes: publicado ? (params.likes ?? null) : null,
+      comentarios: publicado
+        ? (params.comentarios ?? null)
+        : null,
+      clics: publicado ? (params.clics ?? null) : null,
+      ventas_atribuidas: publicado
+        ? (params.ventas_atribuidas ?? null)
+        : null,
+      monto_anuncio:
+        publicado && params.tipo === 'anuncio_pagado'
+          ? (params.monto_anuncio ?? null)
+          : null,
+      url: publicado ? (params.url?.trim() || null) : null
     })
     .select('*')
     .single()
@@ -128,6 +188,8 @@ export async function actualizarPublicacionContenido(
   params: Partial<{
     fecha: string
     tipo: TipoContenido
+    formato: FormatoContenido
+    publicado: boolean
     plataforma: string
     titulo: string
     notas: string | null
@@ -177,6 +239,8 @@ export async function eliminarPublicacionContenido(
 }
 
 export function engagementScore(p: PublicacionContenido): number {
+  if (!p.publicado) return 0
+
   return (
     (p.alcance ?? 0) +
     (p.likes ?? 0) * 2 +
@@ -189,14 +253,18 @@ export function engagementScore(p: PublicacionContenido): number {
 export function resumenContenido(
   publicaciones: PublicacionContenido[]
 ) {
-  const organicos = publicaciones.filter(
+  const publicadas = publicaciones.filter((p) => p.publicado)
+  const programadas = publicaciones.filter(
+    (p) => !p.publicado
+  )
+  const organicos = publicadas.filter(
     (p) => p.tipo === 'organico'
   )
-  const anuncios = publicaciones.filter(
+  const anuncios = publicadas.filter(
     (p) => p.tipo === 'anuncio_pagado'
   )
 
-  const topPorEngagement = [...publicaciones]
+  const topPorEngagement = [...publicadas]
     .sort(
       (a, b) =>
         engagementScore(b) - engagementScore(a)
@@ -208,17 +276,33 @@ export function resumenContenido(
     0
   )
 
-  const ventasAtribuidas = publicaciones.reduce(
+  const ventasAtribuidas = publicadas.reduce(
     (s, p) => s + (p.ventas_atribuidas ?? 0),
     0
   )
 
   return {
     total: publicaciones.length,
+    publicadas: publicadas.length,
+    programadas: programadas.length,
     organicos: organicos.length,
     anuncios: anuncios.length,
     gastoAnuncios,
     ventasAtribuidas,
     topPorEngagement
   }
+}
+
+export function agruparPorFecha(
+  publicaciones: PublicacionContenido[]
+): Map<string, PublicacionContenido[]> {
+  const mapa = new Map<string, PublicacionContenido[]>()
+
+  for (const pub of publicaciones) {
+    const lista = mapa.get(pub.fecha) ?? []
+    lista.push(pub)
+    mapa.set(pub.fecha, lista)
+  }
+
+  return mapa
 }
