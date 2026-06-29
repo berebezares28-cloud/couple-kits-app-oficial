@@ -1,6 +1,7 @@
 import {
   actualizarPublicacionContenido,
   eliminarPublicacionContenido,
+  type EstadoContenido,
   type FormatoContenido
 } from '../../../../scr/lib/contenidoData'
 import { supabase } from '../../../../scr/lib/supabase'
@@ -19,12 +20,10 @@ export async function PATCH(
           ? 'organico'
           : undefined
 
-    const publicado =
-      body.publicado === true
-        ? true
-        : body.publicado === false
-          ? false
-          : undefined
+    const estado =
+      body.estado != null
+        ? parseEstado(body.estado)
+        : undefined
 
     const formato =
       body.formato != null
@@ -38,7 +37,7 @@ export async function PATCH(
         ...(body.fecha && { fecha: body.fecha }),
         ...(tipo && { tipo }),
         ...(formato && { formato }),
-        ...(publicado !== undefined && { publicado }),
+        ...(estado && { estado }),
         ...(body.plataforma && {
           plataforma: body.plataforma
         }),
@@ -48,43 +47,27 @@ export async function PATCH(
         ...(body.notas !== undefined && {
           notas: body.notas?.trim() || null
         }),
-        ...(publicado === false && {
-          alcance: null,
-          likes: null,
-          comentarios: null,
-          clics: null,
-          ventas_atribuidas: null,
-          monto_anuncio: null,
-          url: null
+        ...(body.alcance !== undefined && {
+          alcance: num(body.alcance)
         }),
-        ...(publicado !== false &&
-          body.alcance !== undefined && {
-            alcance: num(body.alcance)
-          }),
-        ...(publicado !== false &&
-          body.likes !== undefined && {
-            likes: num(body.likes)
-          }),
-        ...(publicado !== false &&
-          body.comentarios !== undefined && {
-            comentarios: num(body.comentarios)
-          }),
-        ...(publicado !== false &&
-          body.clics !== undefined && {
-            clics: num(body.clics)
-          }),
-        ...(publicado !== false &&
-          body.ventas_atribuidas !== undefined && {
-            ventas_atribuidas: num(body.ventas_atribuidas)
-          }),
-        ...(publicado !== false &&
-          body.monto_anuncio !== undefined && {
-            monto_anuncio: num(body.monto_anuncio)
-          }),
-        ...(publicado !== false &&
-          body.url !== undefined && {
-            url: body.url?.trim() || null
-          })
+        ...(body.likes !== undefined && {
+          likes: num(body.likes)
+        }),
+        ...(body.comentarios !== undefined && {
+          comentarios: num(body.comentarios)
+        }),
+        ...(body.clics !== undefined && {
+          clics: num(body.clics)
+        }),
+        ...(body.ventas_atribuidas !== undefined && {
+          ventas_atribuidas: num(body.ventas_atribuidas)
+        }),
+        ...(body.monto_anuncio !== undefined && {
+          monto_anuncio: num(body.monto_anuncio)
+        }),
+        ...(body.url !== undefined && {
+          url: body.url?.trim() || null
+        })
       }
     )
 
@@ -157,4 +140,20 @@ function parseFormato(valor: unknown): FormatoContenido {
     return valor as FormatoContenido
   }
   return 'reel'
+}
+
+function parseEstado(valor: unknown): EstadoContenido {
+  const estados: EstadoContenido[] = [
+    'publicado',
+    'programado',
+    'por_hacer',
+    'por_programar'
+  ]
+  if (
+    typeof valor === 'string' &&
+    estados.includes(valor as EstadoContenido)
+  ) {
+    return valor as EstadoContenido
+  }
+  return 'por_hacer'
 }

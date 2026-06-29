@@ -7,10 +7,16 @@ import CalendarioContenido from './CalendarioContenido'
 import {
   emojiFormato,
   engagementScore,
+  esPublicado,
+  ESTADOS_CONTENIDO,
+  etiquetaEstado,
+  etiquetaFechaPorEstado,
+  estiloEstado,
   FORMATOS_CONTENIDO,
   PLATAFORMAS_CONTENIDO,
   resumenContenido,
   TIPOS_CONTENIDO,
+  type EstadoContenido,
   type FormatoContenido,
   type PublicacionContenido,
   type TipoContenido
@@ -27,8 +33,7 @@ type VistaContenido = 'lista' | 'calendario'
 
 type FiltroContenido =
   | 'todos'
-  | 'programados'
-  | 'publicados'
+  | EstadoContenido
   | TipoContenido
 
 type Mensaje = {
@@ -36,44 +41,9 @@ type Mensaje = {
   texto: string
 } | null
 
-function FormularioContenido({
-  tituloForm,
-  publicado,
-  setPublicado,
-  formato,
-  setFormato,
-  tipo,
-  setTipo,
-  fecha,
-  setFecha,
-  plataforma,
-  setPlataforma,
-  titulo,
-  setTitulo,
-  notas,
-  setNotas,
-  alcance,
-  setAlcance,
-  likes,
-  setLikes,
-  comentarios,
-  setComentarios,
-  clics,
-  setClics,
-  ventasAtribuidas,
-  setVentasAtribuidas,
-  montoAnuncio,
-  setMontoAnuncio,
-  url,
-  setUrl,
-  guardando,
-  mensaje,
-  onGuardar,
-  onCancelar
-}: {
-  tituloForm: string
-  publicado: boolean
-  setPublicado: (v: boolean) => void
+type FormFieldsProps = {
+  estado: EstadoContenido
+  setEstado: (v: EstadoContenido) => void
   formato: FormatoContenido
   setFormato: (v: FormatoContenido) => void
   tipo: TipoContenido
@@ -100,44 +70,67 @@ function FormularioContenido({
   setMontoAnuncio: (v: string) => void
   url: string
   setUrl: (v: string) => void
-  guardando: boolean
-  mensaje: Mensaje
-  onGuardar: () => void
-  onCancelar: () => void
-}) {
+}
+
+function ContenidoFormFields({
+  estado,
+  setEstado,
+  formato,
+  setFormato,
+  tipo,
+  setTipo,
+  fecha,
+  setFecha,
+  plataforma,
+  setPlataforma,
+  titulo,
+  setTitulo,
+  notas,
+  setNotas,
+  alcance,
+  setAlcance,
+  likes,
+  setLikes,
+  comentarios,
+  setComentarios,
+  clics,
+  setClics,
+  ventasAtribuidas,
+  setVentasAtribuidas,
+  montoAnuncio,
+  setMontoAnuncio,
+  url,
+  setUrl
+}: FormFieldsProps) {
+  const mostrarMetricas = esPublicado(estado)
+
   return (
     <div className="space-y-4">
-      <h2 className="section-title text-base pr-8">
-        {tituloForm}
-      </h2>
-
       <div>
         <label className="text-xs text-gray-500 mb-2 block">
           Estado
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setPublicado(false)}
-            className="rounded-xl py-2.5 text-sm font-semibold border"
-            style={{
-              background: !publicado ? '#111' : '#fff',
-              color: !publicado ? '#fff' : '#111'
-            }}
-          >
-            Programado
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublicado(true)}
-            className="rounded-xl py-2.5 text-sm font-semibold border"
-            style={{
-              background: publicado ? '#c6302c' : '#fff',
-              color: publicado ? '#fff' : '#111'
-            }}
-          >
-            Publicado
-          </button>
+          {ESTADOS_CONTENIDO.map((item) => {
+            const activo = estado === item.value
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => setEstado(item.value)}
+                className="rounded-xl py-2.5 text-xs font-semibold border transition"
+                style={{
+                  background: activo ? item.bg : '#fff',
+                  color: activo ? item.color : '#111',
+                  borderColor: activo
+                    ? item.color
+                    : '#e5e5e5'
+                }}
+              >
+                {item.label}
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -183,9 +176,7 @@ function FormularioContenido({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
-            {publicado
-              ? 'Fecha de publicación'
-              : 'Fecha programada'}
+            {etiquetaFechaPorEstado(estado)}
           </label>
           <input
             type="date"
@@ -214,12 +205,12 @@ function FormularioContenido({
 
       <div>
         <label className="text-xs text-gray-500 mb-1 block">
-          {publicado ? 'Qué publicaste' : 'Idea del post'}
+          {mostrarMetricas ? 'Qué publicaste' : 'Idea del post'}
         </label>
         <input
           type="text"
           placeholder={
-            publicado
+            mostrarMetricas
               ? 'Ej. Reel unboxing kit San Valentín'
               : 'Ej. Carrusel tips para regalar'
           }
@@ -231,14 +222,14 @@ function FormularioContenido({
 
       <div>
         <label className="text-xs text-gray-500 mb-1 block">
-          {publicado
+          {mostrarMetricas
             ? 'Notas · qué funcionó'
             : 'Notas de planificación'}
         </label>
         <textarea
           rows={3}
           placeholder={
-            publicado
+            mostrarMetricas
               ? 'Ej. El hook del primer segundo funcionó muy bien...'
               : 'Ej. Grabar en la tarde, usar música trending...'
           }
@@ -248,7 +239,7 @@ function FormularioContenido({
         />
       </div>
 
-      {publicado && (
+      {mostrarMetricas && (
         <>
           {tipo === 'anuncio_pagado' && (
             <div>
@@ -354,7 +345,23 @@ function FormularioContenido({
           </div>
         </>
       )}
+    </div>
+  )
+}
 
+function FormularioFooter({
+  mensaje,
+  guardando,
+  onGuardar,
+  onCancelar
+}: {
+  mensaje: Mensaje
+  guardando: boolean
+  onGuardar: () => void
+  onCancelar: () => void
+}) {
+  return (
+    <div className="space-y-3">
       {mensaje && (
         <p
           className="text-sm text-center"
@@ -366,8 +373,7 @@ function FormularioContenido({
           {mensaje.texto}
         </p>
       )}
-
-      <div className="flex gap-2 pb-1">
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={onGuardar}
@@ -412,7 +418,8 @@ export default function ContenidoClient({
     null
   )
 
-  const [publicado, setPublicado] = useState(true)
+  const [estado, setEstado] =
+    useState<EstadoContenido>('por_hacer')
   const [formato, setFormato] =
     useState<FormatoContenido>('reel')
   const [fecha, setFecha] = useState(
@@ -440,16 +447,17 @@ export default function ContenidoClient({
 
   const filtradas = useMemo(() => {
     return publicaciones.filter((p) => {
-      if (filtro === 'programados') return !p.publicado
-      if (filtro === 'publicados') return p.publicado
       if (filtro === 'todos') return true
-      return p.tipo === filtro
+      if (filtro === 'organico' || filtro === 'anuncio_pagado') {
+        return p.tipo === filtro
+      }
+      return p.estado === filtro
     })
   }, [publicaciones, filtro])
 
-  const formProps = {
-    publicado,
-    setPublicado,
+  const formProps: FormFieldsProps = {
+    estado,
+    setEstado,
     formato,
     setFormato,
     tipo,
@@ -475,8 +483,7 @@ export default function ContenidoClient({
     montoAnuncio,
     setMontoAnuncio,
     url,
-    setUrl,
-    guardando
+    setUrl
   }
 
   useEffect(() => {
@@ -490,7 +497,7 @@ export default function ContenidoClient({
   }, [modalEditar])
 
   function resetCampos() {
-    setPublicado(false)
+    setEstado('por_hacer')
     setFormato('reel')
     setFecha(new Date().toISOString().split('T')[0])
     setTipo('organico')
@@ -520,10 +527,10 @@ export default function ContenidoClient({
     setMensajeModal(null)
   }
 
-  function abrirNuevo(esPublicado = false) {
+  function abrirNuevo(estadoInicial: EstadoContenido) {
     cerrarModal()
     resetCampos()
-    setPublicado(esPublicado)
+    setEstado(estadoInicial)
     setMostrarForm(true)
     setVista('lista')
     setMensaje(null)
@@ -532,7 +539,7 @@ export default function ContenidoClient({
   function cargarEnFormulario(p: PublicacionContenido) {
     cerrarCrear()
     setEditandoId(p.id)
-    setPublicado(p.publicado)
+    setEstado(p.estado)
     setFormato(p.formato)
     setFecha(p.fecha)
     setTipo(p.tipo)
@@ -564,7 +571,7 @@ export default function ContenidoClient({
     if (!titulo.trim()) {
       const msg = {
         tipo: 'error' as const,
-        texto: publicado
+        texto: esPublicado(estado)
           ? 'Escribe qué publicaste'
           : 'Escribe de qué tratará el post'
       }
@@ -577,11 +584,12 @@ export default function ContenidoClient({
     if (esEdicion) setMensajeModal(null)
     else setMensaje(null)
 
+    const publicado = esPublicado(estado)
     const payload = {
       fecha,
       tipo,
       formato,
-      publicado,
+      estado,
       plataforma,
       titulo: titulo.trim(),
       notas: notas.trim() || null,
@@ -632,10 +640,7 @@ export default function ContenidoClient({
           )
         )
         cerrarModal()
-        setMensaje({
-          tipo: 'ok',
-          texto: 'Actualizado'
-        })
+        setMensaje({ tipo: 'ok', texto: 'Actualizado' })
       } else {
         setPublicaciones((prev) => [
           data.publicacion,
@@ -644,9 +649,10 @@ export default function ContenidoClient({
         cerrarCrear()
         setMensaje({
           tipo: 'ok',
-          texto: publicado
-            ? 'Publicación registrada'
-            : 'Post programado'
+          texto:
+            estado === 'publicado'
+              ? 'Publicación registrada'
+              : 'Post guardado'
         })
       }
 
@@ -664,8 +670,8 @@ export default function ContenidoClient({
   }
 
   function marcarComoPublicado(p: PublicacionContenido) {
-    cargarEnFormulario({ ...p, publicado: true })
-    setPublicado(true)
+    cargarEnFormulario({ ...p, estado: 'publicado' })
+    setEstado('publicado')
   }
 
   async function eliminar(id: string) {
@@ -695,6 +701,15 @@ export default function ContenidoClient({
     )
     if (editandoId === id) cerrarModal()
   }
+
+  const tituloFormCrear =
+    estado === 'publicado'
+      ? 'Registrar publicación'
+      : estado === 'programado'
+        ? 'Programar post'
+        : estado === 'por_programar'
+          ? 'Post por programar'
+          : 'Nueva idea de post'
 
   return (
     <main className="min-h-screen bg-white">
@@ -754,6 +769,18 @@ export default function ContenidoClient({
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="editorial-card">
+            <p className="metric-label">Por hacer</p>
+            <p className="text-xl font-bold">
+              {resumen.porHacer}
+            </p>
+          </div>
+          <div className="editorial-card">
+            <p className="metric-label">Por programar</p>
+            <p className="text-xl font-bold">
+              {resumen.porProgramar}
+            </p>
+          </div>
+          <div className="editorial-card">
             <p className="metric-label">Programados</p>
             <p className="text-xl font-bold">
               {resumen.programadas}
@@ -763,18 +790,6 @@ export default function ContenidoClient({
             <p className="metric-label">Publicados</p>
             <p className="text-xl font-bold">
               {resumen.publicadas}
-            </p>
-          </div>
-          <div className="editorial-card">
-            <p className="metric-label">Gasto en ads</p>
-            <p className="text-sm font-bold mt-1">
-              {formatearMoneda(resumen.gastoAnuncios)}
-            </p>
-          </div>
-          <div className="editorial-card">
-            <p className="metric-label">Ventas atrib.</p>
-            <p className="text-xl font-bold">
-              {resumen.ventasAtribuidas}
             </p>
           </div>
         </div>
@@ -804,30 +819,47 @@ export default function ContenidoClient({
               <div className="grid grid-cols-2 gap-2 mb-6">
                 <button
                   type="button"
-                  onClick={() => abrirNuevo(false)}
+                  onClick={() => abrirNuevo('por_hacer')}
                   className="rounded-xl py-3 border font-semibold text-sm"
                 >
-                  + Programar post
+                  + Por hacer
                 </button>
                 <button
                   type="button"
-                  onClick={() => abrirNuevo(true)}
+                  onClick={() =>
+                    abrirNuevo('programado')
+                  }
+                  className="rounded-xl py-3 border font-semibold text-sm"
+                >
+                  + Programar
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    abrirNuevo('por_programar')
+                  }
+                  className="rounded-xl py-3 border font-semibold text-sm col-span-1"
+                >
+                  + Por programar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => abrirNuevo('publicado')}
                   className="rounded-xl py-3 text-white font-semibold text-sm"
                   style={{ background: '#c6302c' }}
                 >
-                  + Ya publicado
+                  + Publicado
                 </button>
               </div>
             ) : (
-              <div className="editorial-card mb-6">
-                <FormularioContenido
-                  tituloForm={
-                    publicado
-                      ? 'Registrar publicación'
-                      : 'Programar post'
-                  }
-                  {...formProps}
+              <div className="editorial-card mb-6 space-y-4">
+                <h2 className="section-title text-base">
+                  {tituloFormCrear}
+                </h2>
+                <ContenidoFormFields {...formProps} />
+                <FormularioFooter
                   mensaje={mensaje}
+                  guardando={guardando}
                   onGuardar={() => guardar(false)}
                   onCancelar={cerrarCrear}
                 />
@@ -872,12 +904,14 @@ export default function ContenidoClient({
               </div>
             )}
 
-            <div className="flex gap-2 mb-4 overflow-x-auto">
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
               {(
                 [
                   ['todos', 'Todos'],
-                  ['programados', 'Programados'],
-                  ['publicados', 'Publicados'],
+                  ['por_hacer', 'Por hacer'],
+                  ['por_programar', 'Por programar'],
+                  ['programado', 'Programados'],
+                  ['publicado', 'Publicados'],
                   ['organico', 'Orgánico'],
                   ['anuncio_pagado', 'Anuncios']
                 ] as const
@@ -904,136 +938,134 @@ export default function ContenidoClient({
               </div>
             ) : (
               <div className="space-y-4">
-                {filtradas.map((p) => (
-                  <div
-                    key={p.id}
-                    className="editorial-card"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <div className="flex flex-wrap gap-1.5">
-                          <span
-                            className="text-[0.65rem] uppercase tracking-wider px-2 py-0.5 rounded-full"
-                            style={{
-                              background: p.publicado
-                                ? '#F6FFED'
-                                : '#FFF7E6',
-                              color: p.publicado
-                                ? '#389E0D'
-                                : '#D48806'
-                            }}
-                          >
-                            {p.publicado
-                              ? 'Publicado'
-                              : 'Programado'}
-                          </span>
-                          <span className="text-[0.65rem] uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-50 text-gray-600">
-                            {emojiFormato(p.formato)}{' '}
-                            {
-                              FORMATOS_CONTENIDO.find(
-                                (f) => f.value === p.formato
-                              )?.label
-                            }
-                          </span>
-                          {p.tipo === 'anuncio_pagado' && (
+                {filtradas.map((p) => {
+                  const estilo = estiloEstado(p.estado)
+                  return (
+                    <div
+                      key={p.id}
+                      className="editorial-card"
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div>
+                          <div className="flex flex-wrap gap-1.5">
                             <span
                               className="text-[0.65rem] uppercase tracking-wider px-2 py-0.5 rounded-full"
                               style={{
-                                background: '#F0F5FF',
-                                color: '#1D39C4'
+                                background: estilo.background,
+                                color: estilo.color
                               }}
                             >
-                              Anuncio
+                              {etiquetaEstado(p.estado)}
+                            </span>
+                            <span className="text-[0.65rem] uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-50 text-gray-600">
+                              {emojiFormato(p.formato)}{' '}
+                              {
+                                FORMATOS_CONTENIDO.find(
+                                  (f) =>
+                                    f.value === p.formato
+                                )?.label
+                              }
+                            </span>
+                            {p.tipo === 'anuncio_pagado' && (
+                              <span
+                                className="text-[0.65rem] uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                style={{
+                                  background: '#F0F5FF',
+                                  color: '#1D39C4'
+                                }}
+                              >
+                                Anuncio
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-semibold mt-2">
+                            {p.titulo}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {formatearFechaInsumo(p.fecha)} ·{' '}
+                            {p.plataforma}
+                          </p>
+                        </div>
+                      </div>
+
+                      {esPublicado(p.estado) && (
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                          {p.alcance != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              👁 {p.alcance}
+                            </span>
+                          )}
+                          {p.likes != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              ♥ {p.likes}
+                            </span>
+                          )}
+                          {p.comentarios != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              💬 {p.comentarios}
+                            </span>
+                          )}
+                          {p.clics != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              👆 {p.clics}
+                            </span>
+                          )}
+                          {p.ventas_atribuidas != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              🛒 {p.ventas_atribuidas}
+                            </span>
+                          )}
+                          {p.monto_anuncio != null && (
+                            <span className="bg-gray-50 px-2 py-1 rounded-lg">
+                              💸{' '}
+                              {formatearMoneda(
+                                p.monto_anuncio
+                              )}
                             </span>
                           )}
                         </div>
-                        <p className="font-semibold mt-2">
-                          {p.titulo}
+                      )}
+
+                      {p.notas && (
+                        <p className="mt-3 text-sm text-gray-600 italic">
+                          “{p.notas}”
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {formatearFechaInsumo(p.fecha)} ·{' '}
-                          {p.plataforma}
-                        </p>
-                      </div>
-                    </div>
+                      )}
 
-                    {p.publicado && (
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        {p.alcance != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            👁 {p.alcance}
-                          </span>
+                      <div className="mt-3 flex flex-wrap gap-4">
+                        {!esPublicado(p.estado) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              marcarComoPublicado(p)
+                            }
+                            className="text-sm font-semibold underline"
+                            style={{ color: '#389E0D' }}
+                          >
+                            Marcar publicado
+                          </button>
                         )}
-                        {p.likes != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            ♥ {p.likes}
-                          </span>
-                        )}
-                        {p.comentarios != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            💬 {p.comentarios}
-                          </span>
-                        )}
-                        {p.clics != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            👆 {p.clics}
-                          </span>
-                        )}
-                        {p.ventas_atribuidas != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            🛒 {p.ventas_atribuidas}
-                          </span>
-                        )}
-                        {p.monto_anuncio != null && (
-                          <span className="bg-gray-50 px-2 py-1 rounded-lg">
-                            💸{' '}
-                            {formatearMoneda(
-                              p.monto_anuncio
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    {p.notas && (
-                      <p className="mt-3 text-sm text-gray-600 italic">
-                        “{p.notas}”
-                      </p>
-                    )}
-
-                    <div className="mt-3 flex flex-wrap gap-4">
-                      {!p.publicado && (
                         <button
                           type="button"
                           onClick={() =>
-                            marcarComoPublicado(p)
+                            cargarEnFormulario(p)
                           }
-                          className="text-sm font-semibold underline"
-                          style={{ color: '#389E0D' }}
+                          className="text-sm text-gray-500 underline"
                         >
-                          Marcar publicado
+                          Editar
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          cargarEnFormulario(p)
-                        }
-                        className="text-sm text-gray-500 underline"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => eliminar(p.id)}
-                        className="text-sm underline"
-                        style={{ color: '#CF1322' }}
-                      >
-                        Eliminar
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => eliminar(p.id)}
+                          className="text-sm underline"
+                          style={{ color: '#CF1322' }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </>
@@ -1042,10 +1074,9 @@ export default function ContenidoClient({
 
       {modalEditar && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-0 sm:px-4"
+          className="fixed inset-0 z-50"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="modal-editar-titulo"
         >
           <button
             type="button"
@@ -1054,23 +1085,40 @@ export default function ContenidoClient({
             onClick={cerrarModal}
           />
 
-          <div className="relative w-full max-w-md max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl p-5">
-            <button
-              type="button"
-              onClick={cerrarModal}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full border text-gray-500 hover:bg-gray-50 flex items-center justify-center text-sm"
-              aria-label="Cerrar edición"
+          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none">
+            <div
+              className="pointer-events-auto w-full max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[85dvh]"
+              onClick={(e) => e.stopPropagation()}
             >
-              ✕
-            </button>
+              <div className="shrink-0 px-5 pt-5 pb-2 relative border-b">
+                <h2 className="section-title text-base pr-10">
+                  Editar entrada
+                </h2>
+                <button
+                  type="button"
+                  onClick={cerrarModal}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full border text-gray-500 hover:bg-gray-50 flex items-center justify-center text-sm"
+                  aria-label="Cerrar edición"
+                >
+                  ✕
+                </button>
+              </div>
 
-            <FormularioContenido
-              tituloForm="Editar entrada"
-              {...formProps}
-              mensaje={mensajeModal}
-              onGuardar={() => guardar(true)}
-              onCancelar={cerrarModal}
-            />
+              <div
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 touch-pan-y"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <ContenidoFormFields {...formProps} />
+                <div className="mt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                  <FormularioFooter
+                    mensaje={mensajeModal}
+                    guardando={guardando}
+                    onGuardar={() => guardar(true)}
+                    onCancelar={cerrarModal}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

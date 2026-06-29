@@ -1,6 +1,7 @@
 import {
   crearPublicacionContenido,
   listarPublicacionesContenido,
+  type EstadoContenido,
   type FormatoContenido
 } from '../../../scr/lib/contenidoData'
 import { supabase } from '../../../scr/lib/supabase'
@@ -35,8 +36,7 @@ export async function POST(req: Request) {
       body.tipo === 'anuncio_pagado'
         ? 'anuncio_pagado'
         : 'organico'
-    const publicado = body.publicado !== false
-    const formato = parseFormato(body.formato)
+    const estado = parseEstado(body.estado)
 
     const resultado = await crearPublicacionContenido(
       supabase,
@@ -45,27 +45,18 @@ export async function POST(req: Request) {
           body.fecha ||
           new Date().toISOString().split('T')[0],
         tipo,
-        formato,
-        publicado,
+        formato: parseFormato(body.formato),
+        estado,
         plataforma: body.plataforma || 'Instagram',
         titulo: body.titulo.trim(),
         notas: body.notas?.trim() || null,
-        alcance: publicado ? num(body.alcance) : null,
-        likes: publicado ? num(body.likes) : null,
-        comentarios: publicado
-          ? num(body.comentarios)
-          : null,
-        clics: publicado ? num(body.clics) : null,
-        ventas_atribuidas: publicado
-          ? num(body.ventas_atribuidas)
-          : null,
-        monto_anuncio:
-          publicado && tipo === 'anuncio_pagado'
-            ? num(body.monto_anuncio)
-            : null,
-        url: publicado
-          ? body.url?.trim() || null
-          : null
+        alcance: num(body.alcance),
+        likes: num(body.likes),
+        comentarios: num(body.comentarios),
+        clics: num(body.clics),
+        ventas_atribuidas: num(body.ventas_atribuidas),
+        monto_anuncio: num(body.monto_anuncio),
+        url: body.url?.trim() || null
       }
     )
 
@@ -110,4 +101,20 @@ function parseFormato(valor: unknown): FormatoContenido {
     return valor as FormatoContenido
   }
   return 'reel'
+}
+
+function parseEstado(valor: unknown): EstadoContenido {
+  const estados: EstadoContenido[] = [
+    'publicado',
+    'programado',
+    'por_hacer',
+    'por_programar'
+  ]
+  if (
+    typeof valor === 'string' &&
+    estados.includes(valor as EstadoContenido)
+  ) {
+    return valor as EstadoContenido
+  }
+  return 'por_hacer'
 }

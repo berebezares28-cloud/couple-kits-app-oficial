@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react'
 import {
   agruparPorFecha,
   emojiFormato,
+  etiquetaEstado,
   FORMATOS_CONTENIDO,
+  opacidadCalendario,
   type PublicacionContenido
 } from '../../scr/lib/contenidoData'
 
@@ -207,9 +209,9 @@ export default function CalendarioContenido({
                       key={p.id}
                       className="text-sm leading-none"
                       style={{
-                        opacity: p.publicado ? 1 : 0.45
+                        opacity: opacidadCalendario(p.estado)
                       }}
-                      title={`${p.publicado ? '' : 'Programado: '}${p.titulo}`}
+                      title={`${etiquetaEstado(p.estado)}: ${p.titulo}`}
                     >
                       {emojiFormato(p.formato)}
                     </span>
@@ -235,8 +237,14 @@ export default function CalendarioContenido({
           ))}
           <span className="text-gray-300">·</span>
           <span>
-            <span style={{ opacity: 0.45 }}>🎬</span>{' '}
-            programado
+            <span style={{ opacity: 0.4 }}>🎬</span> por hacer
+          </span>
+          <span>
+            <span style={{ opacity: 0.55 }}>🎬</span> por
+            programar
+          </span>
+          <span>
+            <span style={{ opacity: 0.8 }}>🎬</span> programado
           </span>
           <span>
             <span>🎬</span> publicado
@@ -278,10 +286,8 @@ export default function CalendarioContenido({
                         {p.titulo}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {p.publicado
-                          ? 'Publicado'
-                          : 'Programado'}{' '}
-                        · {p.plataforma}
+                        {etiquetaEstado(p.estado)} ·{' '}
+                        {p.plataforma}
                         {p.tipo === 'anuncio_pagado'
                           ? ' · Anuncio'
                           : ''}

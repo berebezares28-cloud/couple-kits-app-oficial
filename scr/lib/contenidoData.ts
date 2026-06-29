@@ -9,12 +9,18 @@ export type FormatoContenido =
   | 'story'
   | 'otro'
 
+export type EstadoContenido =
+  | 'publicado'
+  | 'programado'
+  | 'por_hacer'
+  | 'por_programar'
+
 export type PublicacionContenido = {
   id: string
   fecha: string
   tipo: TipoContenido
   formato: FormatoContenido
-  publicado: boolean
+  estado: EstadoContenido
   plataforma: string
   titulo: string
   notas: string | null
@@ -27,6 +33,33 @@ export type PublicacionContenido = {
   url: string | null
   created_at: string
 }
+
+export const ESTADOS_CONTENIDO = [
+  {
+    value: 'por_hacer',
+    label: 'Por hacer',
+    color: '#595959',
+    bg: '#F5F5F5'
+  },
+  {
+    value: 'por_programar',
+    label: 'Por programar',
+    color: '#874D00',
+    bg: '#FFF7E6'
+  },
+  {
+    value: 'programado',
+    label: 'Programado',
+    color: '#1D39C4',
+    bg: '#F0F5FF'
+  },
+  {
+    value: 'publicado',
+    label: 'Publicado',
+    color: '#389E0D',
+    bg: '#F6FFED'
+  }
+] as const
 
 export const TIPOS_CONTENIDO = [
   { value: 'organico', label: 'Orgánico' },
@@ -57,6 +90,48 @@ export function emojiFormato(
   )
 }
 
+export function etiquetaEstado(
+  estado: EstadoContenido
+): string {
+  return (
+    ESTADOS_CONTENIDO.find((e) => e.value === estado)
+      ?.label ?? estado
+  )
+}
+
+export function estiloEstado(estado: EstadoContenido) {
+  const item = ESTADOS_CONTENIDO.find(
+    (e) => e.value === estado
+  )
+  return {
+    color: item?.color ?? '#595959',
+    background: item?.bg ?? '#F5F5F5'
+  }
+}
+
+export function esPublicado(
+  estado: EstadoContenido
+): boolean {
+  return estado === 'publicado'
+}
+
+export function opacidadCalendario(
+  estado: EstadoContenido
+): number {
+  switch (estado) {
+    case 'publicado':
+      return 1
+    case 'programado':
+      return 0.8
+    case 'por_programar':
+      return 0.55
+    case 'por_hacer':
+      return 0.4
+    default:
+      return 1
+  }
+}
+
 function parseFormato(
   valor: unknown
 ): FormatoContenido {
@@ -76,13 +151,35 @@ function parseFormato(
   return 'reel'
 }
 
+function parseEstado(valor: unknown): EstadoContenido {
+  const estados: EstadoContenido[] = [
+    'publicado',
+    'programado',
+    'por_hacer',
+    'por_programar'
+  ]
+  if (
+    typeof valor === 'string' &&
+    estados.includes(valor as EstadoContenido)
+  ) {
+    return valor as EstadoContenido
+  }
+  return 'por_hacer'
+}
+
 function mapPublicacion(row: Record<string, unknown>): PublicacionContenido {
+  const estado = row.estado
+    ? parseEstado(row.estado)
+    : row.publicado !== false
+      ? 'publicado'
+      : 'programado'
+
   return {
     id: String(row.id),
     fecha: String(row.fecha).slice(0, 10),
     tipo: row.tipo as TipoContenido,
     formato: parseFormato(row.formato),
-    publicado: row.publicado !== false,
+    estado,
     plataforma: String(row.plataforma ?? 'instagram'),
     titulo: String(row.titulo ?? ''),
     notas: row.notas != null ? String(row.notas) : null,
@@ -106,6 +203,38 @@ function mapPublicacion(row: Record<string, unknown>): PublicacionContenido {
   }
 }
 
+function limpiarMetricasSiNoPublicado<
+  T extends { estado: EstadoContenido }
+>(params: T & {
+  alcance?: number | null
+  likes?: number | null
+  comentarios?: number | null
+  clics?: number | null
+  ventas_atribuidas?: number | null
+  monto_anuncio?: number | null
+  url?: string | null
+  tipo?: TipoContenido
+}) {
+  if (params.estado !== 'publicado') {
+    return {
+      ...params,
+      alcance: null,
+      likes: null,
+      comentarios: null,
+      clics: null,
+      ventas_atribuidas: null,
+      monto_anuncio: null,
+      url: null
+    }
+  }
+
+  if (params.tipo !== 'anuncio_pagado') {
+    return { ...params, monto_anuncio: null }
+  }
+
+  return params
+}
+
 export async function listarPublicacionesContenido(
   supabase: SupabaseClient
 ): Promise<PublicacionContenido[]> {
@@ -126,7 +255,7 @@ export async function crearPublicacionContenido(
     fecha: string
     tipo: TipoContenido
     formato?: FormatoContenido
-    publicado?: boolean
+    estado?: EstadoContenido
     plataforma: string
     titulo: string
     notas?: string | null
@@ -142,32 +271,29 @@ export async function crearPublicacionContenido(
   | { ok: true; publicacion: PublicacionContenido }
   | { ok: false; error: string }
 > {
-  const publicado = params.publicado ?? true
+  const estado = params.estado ?? 'por_hacer'
+  const datos = limpiarMetricasSiNoPublicado({
+    fecha: params.fecha,
+    tipo: params.tipo,
+    formato: params.formato ?? 'reel',
+    estado,
+    plataforma: params.plataforma.trim(),
+    titulo: params.titulo.trim(),
+    notas: params.notas?.trim() || null,
+    alcance: params.alcance ?? null,
+    likes: params.likes ?? null,
+    comentarios: params.comentarios ?? null,
+    clics: params.clics ?? null,
+    ventas_atribuidas: params.ventas_atribuidas ?? null,
+    monto_anuncio: params.monto_anuncio ?? null,
+    url: params.url?.trim() || null
+  })
 
   const { data, error } = await supabase
     .from('contenido_publicaciones')
     .insert({
-      fecha: params.fecha,
-      tipo: params.tipo,
-      formato: params.formato ?? 'reel',
-      publicado,
-      plataforma: params.plataforma.trim(),
-      titulo: params.titulo.trim(),
-      notas: params.notas?.trim() || null,
-      alcance: publicado ? (params.alcance ?? null) : null,
-      likes: publicado ? (params.likes ?? null) : null,
-      comentarios: publicado
-        ? (params.comentarios ?? null)
-        : null,
-      clics: publicado ? (params.clics ?? null) : null,
-      ventas_atribuidas: publicado
-        ? (params.ventas_atribuidas ?? null)
-        : null,
-      monto_anuncio:
-        publicado && params.tipo === 'anuncio_pagado'
-          ? (params.monto_anuncio ?? null)
-          : null,
-      url: publicado ? (params.url?.trim() || null) : null
+      ...datos,
+      publicado: estado === 'publicado'
     })
     .select('*')
     .single()
@@ -189,7 +315,7 @@ export async function actualizarPublicacionContenido(
     fecha: string
     tipo: TipoContenido
     formato: FormatoContenido
-    publicado: boolean
+    estado: EstadoContenido
     plataforma: string
     titulo: string
     notas: string | null
@@ -205,9 +331,25 @@ export async function actualizarPublicacionContenido(
   | { ok: true; publicacion: PublicacionContenido }
   | { ok: false; error: string }
 > {
+  const updateParams =
+    params.estado && params.estado !== 'publicado'
+      ? limpiarMetricasSiNoPublicado({
+          ...params,
+          estado: params.estado,
+          tipo: params.tipo
+        })
+      : params
+
+  const payload = {
+    ...updateParams,
+    ...(updateParams.estado !== undefined && {
+      publicado: updateParams.estado === 'publicado'
+    })
+  }
+
   const { data, error } = await supabase
     .from('contenido_publicaciones')
-    .update(params)
+    .update(payload)
     .eq('id', id)
     .select('*')
     .single()
@@ -239,7 +381,7 @@ export async function eliminarPublicacionContenido(
 }
 
 export function engagementScore(p: PublicacionContenido): number {
-  if (!p.publicado) return 0
+  if (!esPublicado(p.estado)) return 0
 
   return (
     (p.alcance ?? 0) +
@@ -253,9 +395,19 @@ export function engagementScore(p: PublicacionContenido): number {
 export function resumenContenido(
   publicaciones: PublicacionContenido[]
 ) {
-  const publicadas = publicaciones.filter((p) => p.publicado)
-  const programadas = publicaciones.filter(
-    (p) => !p.publicado
+  const porEstado = {
+    por_hacer: 0,
+    por_programar: 0,
+    programado: 0,
+    publicado: 0
+  }
+
+  for (const p of publicaciones) {
+    porEstado[p.estado]++
+  }
+
+  const publicadas = publicaciones.filter((p) =>
+    esPublicado(p.estado)
   )
   const organicos = publicadas.filter(
     (p) => p.tipo === 'organico'
@@ -283,8 +435,10 @@ export function resumenContenido(
 
   return {
     total: publicaciones.length,
-    publicadas: publicadas.length,
-    programadas: programadas.length,
+    porHacer: porEstado.por_hacer,
+    porProgramar: porEstado.por_programar,
+    programadas: porEstado.programado,
+    publicadas: porEstado.publicado,
     organicos: organicos.length,
     anuncios: anuncios.length,
     gastoAnuncios,
@@ -305,4 +459,21 @@ export function agruparPorFecha(
   }
 
   return mapa
+}
+
+export function etiquetaFechaPorEstado(
+  estado: EstadoContenido
+): string {
+  switch (estado) {
+    case 'publicado':
+      return 'Fecha de publicación'
+    case 'programado':
+      return 'Fecha programada'
+    case 'por_programar':
+      return 'Fecha tentativa'
+    case 'por_hacer':
+      return 'Fecha (opcional)'
+    default:
+      return 'Fecha'
+  }
 }
