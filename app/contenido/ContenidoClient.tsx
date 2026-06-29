@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import CalendarioContenido from './CalendarioContenido'
+import CalendarioFeedGrid from './CalendarioFeedGrid'
 import {
   emojiFormato,
   engagementScore,
@@ -29,7 +30,7 @@ import {
 const inputClass =
   'w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:border-black'
 
-type VistaContenido = 'lista' | 'calendario'
+type VistaContenido = 'feed' | 'lista' | 'calendario'
 
 type FiltroContenido =
   | 'todos'
@@ -405,10 +406,12 @@ export default function ContenidoClient({
   const [publicaciones, setPublicaciones] = useState(
     publicacionesIniciales
   )
-  const [vista, setVista] = useState<VistaContenido>('lista')
+  const [vista, setVista] = useState<VistaContenido>('feed')
   const [filtro, setFiltro] = useState<FiltroContenido>('todos')
-  const [mostrarForm, setMostrarForm] = useState(false)
-  const [modalEditar, setModalEditar] = useState(false)
+  const [filtrosAbiertos, setFiltrosAbiertos] =
+    useState(false)
+  const [modalFormulario, setModalFormulario] =
+    useState(false)
   const [editandoId, setEditandoId] = useState<string | null>(
     null
   )
@@ -487,14 +490,14 @@ export default function ContenidoClient({
   }
 
   useEffect(() => {
-    if (!modalEditar) return
+    if (!modalFormulario) return
 
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prev
     }
-  }, [modalEditar])
+  }, [modalFormulario])
 
   function resetCampos() {
     setEstado('por_hacer')
@@ -513,31 +516,22 @@ export default function ContenidoClient({
     setUrl('')
   }
 
-  function cerrarCrear() {
-    setEditandoId(null)
-    resetCampos()
-    setMostrarForm(false)
-    setMensaje(null)
-  }
-
   function cerrarModal() {
     setEditandoId(null)
     resetCampos()
-    setModalEditar(false)
+    setModalFormulario(false)
     setMensajeModal(null)
   }
 
-  function abrirNuevo(estadoInicial: EstadoContenido) {
-    cerrarModal()
+  function abrirNuevo() {
     resetCampos()
-    setEstado(estadoInicial)
-    setMostrarForm(true)
-    setVista('lista')
-    setMensaje(null)
+    setEstado('por_hacer')
+    setEditandoId(null)
+    setMensajeModal(null)
+    setModalFormulario(true)
   }
 
   function cargarEnFormulario(p: PublicacionContenido) {
-    cerrarCrear()
     setEditandoId(p.id)
     setEstado(p.estado)
     setFormato(p.formato)
@@ -564,26 +558,24 @@ export default function ContenidoClient({
     )
     setUrl(p.url ?? '')
     setMensajeModal(null)
-    setModalEditar(true)
+    setModalFormulario(true)
   }
 
-  async function guardar(esEdicion: boolean) {
+  async function guardar() {
     if (!titulo.trim()) {
-      const msg = {
-        tipo: 'error' as const,
+      setMensajeModal({
+        tipo: 'error',
         texto: esPublicado(estado)
           ? 'Escribe qué publicaste'
           : 'Escribe de qué tratará el post'
-      }
-      if (esEdicion) setMensajeModal(msg)
-      else setMensaje(msg)
+      })
       return
     }
 
     setGuardando(true)
-    if (esEdicion) setMensajeModal(null)
-    else setMensaje(null)
+    setMensajeModal(null)
 
+    const esEdicion = Boolean(editandoId)
     const publicado = esPublicado(estado)
     const payload = {
       fecha,
@@ -624,12 +616,10 @@ export default function ContenidoClient({
       const data = await res.json()
 
       if (!res.ok) {
-        const msg = {
-          tipo: 'error' as const,
+        setMensajeModal({
+          tipo: 'error',
           texto: data.error || 'Error al guardar'
-        }
-        if (esEdicion) setMensajeModal(msg)
-        else setMensaje(msg)
+        })
         return
       }
 
@@ -646,7 +636,7 @@ export default function ContenidoClient({
           data.publicacion,
           ...prev
         ])
-        cerrarCrear()
+        cerrarModal()
         setMensaje({
           tipo: 'ok',
           texto:
@@ -658,12 +648,10 @@ export default function ContenidoClient({
 
       router.refresh()
     } catch {
-      const msg = {
-        tipo: 'error' as const,
+      setMensajeModal({
+        tipo: 'error',
         texto: 'Error de conexión'
-      }
-      if (esEdicion) setMensajeModal(msg)
-      else setMensaje(msg)
+      })
     } finally {
       setGuardando(false)
     }
@@ -748,6 +736,7 @@ export default function ContenidoClient({
         <div className="flex gap-2 mb-6">
           {(
             [
+              ['feed', 'Feed'],
               ['lista', 'Lista'],
               ['calendario', 'Calendario']
             ] as const
@@ -767,34 +756,7 @@ export default function ContenidoClient({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="editorial-card">
-            <p className="metric-label">Por hacer</p>
-            <p className="text-xl font-bold">
-              {resumen.porHacer}
-            </p>
-          </div>
-          <div className="editorial-card">
-            <p className="metric-label">Por programar</p>
-            <p className="text-xl font-bold">
-              {resumen.porProgramar}
-            </p>
-          </div>
-          <div className="editorial-card">
-            <p className="metric-label">Programados</p>
-            <p className="text-xl font-bold">
-              {resumen.programadas}
-            </p>
-          </div>
-          <div className="editorial-card">
-            <p className="metric-label">Publicados</p>
-            <p className="text-xl font-bold">
-              {resumen.publicadas}
-            </p>
-          </div>
-        </div>
-
-        {mensaje && vista === 'calendario' && (
+        {mensaje && !modalFormulario && (
           <p
             className="text-sm text-center mb-4"
             style={{
@@ -808,78 +770,86 @@ export default function ContenidoClient({
           </p>
         )}
 
-        {vista === 'calendario' ? (
+        {(vista === 'feed' || vista === 'lista') && (
+          <>
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={abrirNuevo}
+                className="flex-1 rounded-xl py-3 text-white font-semibold"
+                style={{ background: '#c6302c' }}
+              >
+                + Agregar
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setFiltrosAbiertos((v) => !v)
+                }
+                className="shrink-0 px-4 rounded-xl py-3 text-sm font-semibold border"
+                style={{
+                  background:
+                    filtrosAbiertos || filtro !== 'todos'
+                      ? '#111'
+                      : '#fff',
+                  color:
+                    filtrosAbiertos || filtro !== 'todos'
+                      ? '#fff'
+                      : '#111'
+                }}
+              >
+                Filtrar
+              </button>
+            </div>
+
+            {filtrosAbiertos && (
+              <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                {(
+                  [
+                    ['todos', 'Todos'],
+                    ['por_hacer', 'Por hacer'],
+                    ['por_programar', 'Por programar'],
+                    ['programado', 'Programados'],
+                    ['publicado', 'Publicados'],
+                    ['organico', 'Orgánico'],
+                    ['anuncio_pagado', 'Anuncios']
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setFiltro(id)}
+                    className="px-4 py-2 rounded-full text-sm border whitespace-nowrap"
+                    style={{
+                      background:
+                        filtro === id ? '#111' : '#fff',
+                      color: filtro === id ? '#fff' : '#111'
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {vista === 'feed' && (
+          <CalendarioFeedGrid
+            publicaciones={filtradas}
+            onSeleccionar={cargarEnFormulario}
+          />
+        )}
+
+        {vista === 'calendario' && (
           <CalendarioContenido
             publicaciones={publicaciones}
             onSeleccionar={cargarEnFormulario}
           />
-        ) : (
+        )}
+
+        {vista === 'lista' && (
           <>
-            {!mostrarForm ? (
-              <div className="grid grid-cols-2 gap-2 mb-6">
-                <button
-                  type="button"
-                  onClick={() => abrirNuevo('por_hacer')}
-                  className="rounded-xl py-3 border font-semibold text-sm"
-                >
-                  + Por hacer
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    abrirNuevo('programado')
-                  }
-                  className="rounded-xl py-3 border font-semibold text-sm"
-                >
-                  + Programar
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    abrirNuevo('por_programar')
-                  }
-                  className="rounded-xl py-3 border font-semibold text-sm col-span-1"
-                >
-                  + Por programar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => abrirNuevo('publicado')}
-                  className="rounded-xl py-3 text-white font-semibold text-sm"
-                  style={{ background: '#c6302c' }}
-                >
-                  + Publicado
-                </button>
-              </div>
-            ) : (
-              <div className="editorial-card mb-6 space-y-4">
-                <h2 className="section-title text-base">
-                  {tituloFormCrear}
-                </h2>
-                <ContenidoFormFields {...formProps} />
-                <FormularioFooter
-                  mensaje={mensaje}
-                  guardando={guardando}
-                  onGuardar={() => guardar(false)}
-                  onCancelar={cerrarCrear}
-                />
-              </div>
-            )}
-
-            {mensaje && !mostrarForm && (
-              <p
-                className="text-sm text-center mb-4"
-                style={{
-                  color:
-                    mensaje.tipo === 'ok'
-                      ? '#389E0D'
-                      : '#CF1322'
-                }}
-              >
-                {mensaje.texto}
-              </p>
-            )}
-
             {resumen.topPorEngagement.length > 0 && (
               <div className="editorial-card mb-6">
                 <h2 className="section-title text-base mb-3">
@@ -903,34 +873,6 @@ export default function ContenidoClient({
                 </div>
               </div>
             )}
-
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-              {(
-                [
-                  ['todos', 'Todos'],
-                  ['por_hacer', 'Por hacer'],
-                  ['por_programar', 'Por programar'],
-                  ['programado', 'Programados'],
-                  ['publicado', 'Publicados'],
-                  ['organico', 'Orgánico'],
-                  ['anuncio_pagado', 'Anuncios']
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setFiltro(id)}
-                  className="px-4 py-2 rounded-full text-sm border whitespace-nowrap"
-                  style={{
-                    background:
-                      filtro === id ? '#111' : '#fff',
-                    color: filtro === id ? '#fff' : '#111'
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
 
             {filtradas.length === 0 ? (
               <div className="editorial-card text-center text-gray-400 py-8">
@@ -1072,7 +1014,7 @@ export default function ContenidoClient({
         )}
       </div>
 
-      {modalEditar && (
+      {modalFormulario && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-5"
           role="dialog"
@@ -1092,13 +1034,15 @@ export default function ContenidoClient({
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="section-title text-base">
-                Editar entrada
+                {editandoId
+                  ? 'Editar entrada'
+                  : tituloFormCrear}
               </h2>
               <button
                 type="button"
                 onClick={cerrarModal}
                 className="text-sm font-medium text-[#c6302c] px-2 py-1"
-                aria-label="Cerrar edición"
+                aria-label="Cerrar"
               >
                 Cerrar
               </button>
@@ -1110,9 +1054,19 @@ export default function ContenidoClient({
               <FormularioFooter
                 mensaje={mensajeModal}
                 guardando={guardando}
-                onGuardar={() => guardar(true)}
+                onGuardar={guardar}
                 onCancelar={cerrarModal}
               />
+              {editandoId && (
+                <button
+                  type="button"
+                  onClick={() => eliminar(editandoId)}
+                  className="w-full mt-3 py-2 text-sm underline"
+                  style={{ color: '#CF1322' }}
+                >
+                  Eliminar entrada
+                </button>
+              )}
             </div>
           </div>
         </div>
