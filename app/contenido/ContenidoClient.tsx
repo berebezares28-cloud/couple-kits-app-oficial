@@ -1074,50 +1074,45 @@ export default function ContenidoClient({
 
       {modalEditar && (
         <div
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-[60] flex items-center justify-center p-5"
           role="dialog"
           aria-modal="true"
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/45"
+            className="absolute inset-0 bg-black/40"
             aria-label="Cerrar"
             onClick={cerrarModal}
           />
 
-          <div className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:p-4 pointer-events-none">
-            <div
-              className="pointer-events-auto w-full max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[85dvh]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="shrink-0 px-5 pt-5 pb-2 relative border-b">
-                <h2 className="section-title text-base pr-10">
-                  Editar entrada
-                </h2>
-                <button
-                  type="button"
-                  onClick={cerrarModal}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full border text-gray-500 hover:bg-gray-50 flex items-center justify-center text-sm"
-                  aria-label="Cerrar edición"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div
-                className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 touch-pan-y"
-                style={{ WebkitOverflowScrolling: 'touch' }}
+          <div
+            className="relative w-full max-w-sm bg-white rounded-2xl border-2 border-black shadow-[4px_4px_0_#000] p-4 max-h-[85vh] overflow-y-auto overscroll-contain"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="section-title text-base">
+                Editar entrada
+              </h2>
+              <button
+                type="button"
+                onClick={cerrarModal}
+                className="text-sm font-medium text-[#c6302c] px-2 py-1"
+                aria-label="Cerrar edición"
               >
-                <ContenidoFormFields {...formProps} />
-                <div className="mt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  <FormularioFooter
-                    mensaje={mensajeModal}
-                    guardando={guardando}
-                    onGuardar={() => guardar(true)}
-                    onCancelar={cerrarModal}
-                  />
-                </div>
-              </div>
+                Cerrar
+              </button>
+            </div>
+
+            <ContenidoFormFields {...formProps} />
+
+            <div className="mt-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <FormularioFooter
+                mensaje={mensajeModal}
+                guardando={guardando}
+                onGuardar={() => guardar(true)}
+                onCancelar={cerrarModal}
+              />
             </div>
           </div>
         </div>
