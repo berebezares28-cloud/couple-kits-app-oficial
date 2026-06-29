@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   calcularInformePerformance,
   emojiFormatoInforme,
@@ -16,6 +16,10 @@ import {
   FORMATOS_CONTENIDO,
   type PublicacionContenido
 } from '../../scr/lib/contenidoData'
+import {
+  exportarElementoPdf,
+  nombreArchivoInforme
+} from '../../scr/lib/exportarInformePdf'
 import { formatearFechaInsumo } from '../../scr/lib/insumosUtils'
 
 function TarjetaDestacada({
@@ -70,26 +74,29 @@ function FilaRanking({
   posicion: number
   onSeleccionar?: (p: PublicacionContenido) => void
 }) {
+  const contenido = (
+    <div className="flex gap-2 items-start">
+      <span className="text-sm font-bold text-gray-400 w-5 shrink-0">
+        {posicion}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium leading-snug break-words">
+          {emojiFormato(pub.formato)} {pub.titulo}
+        </p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {formatearFechaInsumo(pub.fecha)} · {lineaMetricas(pub)}
+        </p>
+      </div>
+    </div>
+  )
+
   return (
     <button
       type="button"
       onClick={() => onSeleccionar?.(pub)}
       className="w-full text-left rounded-xl border border-gray-100 px-3 py-2.5 hover:bg-gray-50 transition"
     >
-      <div className="flex gap-2 items-start">
-        <span className="text-sm font-bold text-gray-400 w-5 shrink-0">
-          {posicion}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate">
-            {emojiFormato(pub.formato)} {pub.titulo}
-          </p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {formatearFechaInsumo(pub.fecha)} ·{' '}
-            {lineaMetricas(pub)}
-          </p>
-        </div>
-      </div>
+      {contenido}
     </button>
   )
 }
@@ -106,6 +113,8 @@ export default function InformePerformance({
   const [mes, setMes] = useState(hoy.getMonth())
   const [formato, setFormato] =
     useState<FiltroFormatoInforme>('reel')
+  const [descargando, setDescargando] = useState(false)
+  const informeRef = useRef<HTMLDivElement>(null)
 
   const informe = useMemo(
     () =>
@@ -136,22 +145,33 @@ export default function InformePerformance({
     }
   }
 
+  async function descargarPdf() {
+    if (!informeRef.current || descargando) return
+
+    setDescargando(true)
+    try {
+      await exportarElementoPdf(
+        informeRef.current,
+        nombreArchivoInforme(
+          etiquetaMes(anio, mes),
+          etiquetaFormatoInforme(formato)
+        )
+      )
+    } catch (error) {
+      console.error('Error al generar PDF:', error)
+      window.alert('No se pudo generar el PDF. Probá de nuevo.')
+    } finally {
+      setDescargando(false)
+    }
+  }
+
   const { mes: resumenMes, historico } = informe
   const esReel = formato === 'reel'
+  const etiquetaMesActual = etiquetaMes(anio, mes)
+  const etiquetaFormatoActual = etiquetaFormatoInforme(formato)
 
   return (
     <div className="space-y-4">
-      <div className="editorial-card text-center">
-        <p className="text-[0.65rem] uppercase tracking-[0.2em] text-gray-400 mb-1">
-          Informe de performance
-        </p>
-        <p className="text-sm text-gray-600">
-          Listo para screenshot ·{' '}
-          {emojiFormatoInforme(formato)}{' '}
-          {etiquetaFormatoInforme(formato)}
-        </p>
-      </div>
-
       <div className="flex gap-2 overflow-x-auto pb-1">
         <button
           type="button"
@@ -164,30 +184,29 @@ export default function InformePerformance({
         >
           🎬 Reels
         </button>
-        {FORMATOS_CONTENIDO.filter(
-          (f) => f.value !== 'reel'
-        ).map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            onClick={() => setFormato(f.value)}
-            className="px-3 py-2 rounded-full text-sm border whitespace-nowrap"
-            style={{
-              background:
-                formato === f.value ? '#111' : '#fff',
-              color: formato === f.value ? '#fff' : '#111'
-            }}
-          >
-            {f.emoji} {f.label}
-          </button>
-        ))}
+        {FORMATOS_CONTENIDO.filter((f) => f.value !== 'reel').map(
+          (f) => (
+            <button
+              key={f.value}
+              type="button"
+              onClick={() => setFormato(f.value)}
+              className="px-3 py-2 rounded-full text-sm border whitespace-nowrap"
+              style={{
+                background:
+                  formato === f.value ? '#111' : '#fff',
+                color: formato === f.value ? '#fff' : '#111'
+              }}
+            >
+              {f.emoji} {f.label}
+            </button>
+          )
+        )}
         <button
           type="button"
           onClick={() => setFormato('todos')}
           className="px-3 py-2 rounded-full text-sm border whitespace-nowrap"
           style={{
-            background:
-              formato === 'todos' ? '#111' : '#fff',
+            background: formato === 'todos' ? '#111' : '#fff',
             color: formato === 'todos' ? '#fff' : '#111'
           }}
         >
@@ -195,161 +214,180 @@ export default function InformePerformance({
         </button>
       </div>
 
-      <div className="editorial-card">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={mesAnterior}
-            className="w-9 h-9 rounded-lg border text-lg hover:bg-gray-50"
+            className="w-9 h-9 rounded-lg border text-lg hover:bg-gray-50 shrink-0"
             aria-label="Mes anterior"
           >
             ‹
           </button>
-          <div className="text-center">
-            <p className="font-semibold">
-              {etiquetaMes(anio, mes)}
-            </p>
-            {esReel && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                Meta: {META_REELS_MES} reels / mes
-              </p>
-            )}
-          </div>
           <button
             type="button"
             onClick={mesSiguiente}
-            className="w-9 h-9 rounded-lg border text-lg hover:bg-gray-50"
+            className="w-9 h-9 rounded-lg border text-lg hover:bg-gray-50 shrink-0"
             aria-label="Mes siguiente"
           >
             ›
           </button>
+          <p className="text-sm font-semibold">{etiquetaMesActual}</p>
         </div>
+        <button
+          type="button"
+          onClick={descargarPdf}
+          disabled={descargando}
+          className="px-4 py-2 rounded-lg text-sm font-medium border border-black bg-black text-white hover:bg-gray-900 disabled:opacity-50 whitespace-nowrap shrink-0"
+        >
+          {descargando ? 'Generando…' : 'Descargar PDF'}
+        </button>
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
-            <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
-              Publicados
-            </p>
-            <p className="text-xl font-bold mt-1">
-              {resumenMes.publicados}
-              {esReel ? ` / ${META_REELS_MES}` : ''}
-            </p>
-          </div>
-          <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
-            <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
-              Con métricas
-            </p>
-            <p className="text-xl font-bold mt-1">
-              {resumenMes.conMetricas}
-            </p>
-          </div>
-          <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
-            <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
-              ♥ Promedio
-            </p>
-            <p className="text-lg font-bold mt-1">
-              {formatearMetrica(resumenMes.promedioLikes)}
-            </p>
-          </div>
-          <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
-            <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
-              👁 Promedio
-            </p>
-            <p className="text-lg font-bold mt-1">
-              {formatearMetrica(resumenMes.promedioAlcance)}
-            </p>
-          </div>
-        </div>
-
-        {resumenMes.promedioComentarios != null && (
-          <p className="text-xs text-center text-gray-500 mt-3">
-            💬 Promedio comentarios:{' '}
-            {formatearMetrica(resumenMes.promedioComentarios)}
+      <div
+        ref={informeRef}
+        className="space-y-4 bg-white p-1 rounded-xl"
+      >
+        <div className="editorial-card text-center">
+          <p className="text-[0.65rem] uppercase tracking-[0.2em] text-gray-400 mb-1">
+            Informe de performance
           </p>
-        )}
-      </div>
+          <p className="text-sm text-gray-600">
+            {emojiFormatoInforme(formato)} {etiquetaFormatoActual}
+          </p>
+          <p className="text-base font-semibold mt-2">
+            {etiquetaMesActual}
+          </p>
+          {esReel && (
+            <p className="text-xs text-gray-500 mt-1">
+              Meta: {META_REELS_MES} reels / mes
+            </p>
+          )}
+        </div>
 
-      <div className="space-y-3">
-        <TarjetaDestacada
-          titulo="Mejor del mes"
-          emoji="🏆"
-          pub={resumenMes.mejor}
-          tono="mejor"
-        />
-        <TarjetaDestacada
-          titulo="Menor del mes"
-          emoji="📉"
-          pub={resumenMes.peor}
-          tono="peor"
-        />
-      </div>
-
-      {resumenMes.ranking.length > 0 && (
         <div className="editorial-card">
-          <h2 className="section-title text-base mb-3">
-            Ranking del mes
-          </h2>
-          <div className="space-y-2">
-            {resumenMes.ranking.map((p, i) => (
-              <FilaRanking
-                key={p.id}
-                pub={p}
-                posicion={i + 1}
-                onSeleccionar={onSeleccionar}
-              />
-            ))}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
+              <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
+                Publicados
+              </p>
+              <p className="text-xl font-bold mt-1">
+                {resumenMes.publicados}
+                {esReel ? ` / ${META_REELS_MES}` : ''}
+              </p>
+            </div>
+            <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
+              <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
+                Con métricas
+              </p>
+              <p className="text-xl font-bold mt-1">
+                {resumenMes.conMetricas}
+              </p>
+            </div>
+            <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
+              <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
+                ♥ Promedio
+              </p>
+              <p className="text-lg font-bold mt-1">
+                {formatearMetrica(resumenMes.promedioLikes)}
+              </p>
+            </div>
+            <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
+              <p className="text-[0.6rem] uppercase tracking-wider text-gray-400">
+                👁 Promedio
+              </p>
+              <p className="text-lg font-bold mt-1">
+                {formatearMetrica(resumenMes.promedioAlcance)}
+              </p>
+            </div>
           </div>
+
+          {resumenMes.promedioComentarios != null && (
+            <p className="text-xs text-center text-gray-500 mt-3">
+              💬 Promedio comentarios:{' '}
+              {formatearMetrica(resumenMes.promedioComentarios)}
+            </p>
+          )}
         </div>
-      )}
 
-      {resumenMes.publicados === 0 && (
-        <div className="editorial-card text-center text-gray-400 py-6 text-sm">
-          Sin publicaciones de este tipo en{' '}
-          {etiquetaMes(anio, mes)}
+        <div className="space-y-3">
+          <TarjetaDestacada
+            titulo="Mejor del mes"
+            emoji="🏆"
+            pub={resumenMes.mejor}
+            tono="mejor"
+          />
+          <TarjetaDestacada
+            titulo="Menor del mes"
+            emoji="📉"
+            pub={resumenMes.peor}
+            tono="peor"
+          />
         </div>
-      )}
 
-      <div className="editorial-card border-2 border-black">
-        <h2 className="section-title text-base mb-1">
-          Histórico
-        </h2>
-        <p className="text-xs text-gray-500 mb-4">
-          {historico.totalPublicados} publicados en total
-        </p>
-
-        {historico.mejor ? (
-          <>
-            <TarjetaDestacada
-              titulo={`Mejor ${etiquetaFormatoInforme(formato).toLowerCase()} de siempre`}
-              emoji="⭐"
-              pub={historico.mejor}
-              tono="mejor"
-            />
-
-            {historico.ranking.length > 1 && (
-              <div className="mt-4">
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
-                  Top histórico
-                </p>
-                <div className="space-y-2">
-                  {historico.ranking.map((p, i) => (
-                    <FilaRanking
-                      key={p.id}
-                      pub={p}
-                      posicion={i + 1}
-                      onSeleccionar={onSeleccionar}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-gray-400">
-            Aún no hay métricas históricas para este
-            formato
-          </p>
+        {resumenMes.ranking.length > 0 && (
+          <div className="editorial-card">
+            <h2 className="section-title text-base mb-3">
+              Ranking del mes
+            </h2>
+            <div className="space-y-2">
+              {resumenMes.ranking.map((p, i) => (
+                <FilaRanking
+                  key={p.id}
+                  pub={p}
+                  posicion={i + 1}
+                  onSeleccionar={onSeleccionar}
+                />
+              ))}
+            </div>
+          </div>
         )}
+
+        {resumenMes.publicados === 0 && (
+          <div className="editorial-card text-center text-gray-400 py-6 text-sm">
+            Sin publicaciones de este tipo en {etiquetaMesActual}
+          </div>
+        )}
+
+        <div className="editorial-card border-2 border-black">
+          <h2 className="section-title text-base mb-1">Histórico</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {historico.totalPublicados} publicados en total
+          </p>
+
+          {historico.mejor ? (
+            <>
+              <TarjetaDestacada
+                titulo={`Mejor ${etiquetaFormatoActual.toLowerCase()} de siempre`}
+                emoji="⭐"
+                pub={historico.mejor}
+                tono="mejor"
+              />
+
+              {historico.ranking.length > 1 && (
+                <div className="mt-4">
+                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+                    Top histórico
+                  </p>
+                  <div className="space-y-2">
+                    {historico.ranking.map((p, i) => (
+                      <FilaRanking
+                        key={p.id}
+                        pub={p}
+                        posicion={i + 1}
+                        onSeleccionar={onSeleccionar}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-400">
+              Aún no hay métricas históricas para este formato
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )
