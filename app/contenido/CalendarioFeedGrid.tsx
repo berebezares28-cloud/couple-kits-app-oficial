@@ -43,14 +43,26 @@ export default function CalendarioFeedGrid({
       <div className="grid grid-cols-3 gap-1">
         {ordenadas.map((p) => {
           const estilo = estiloEstado(p.estado)
+          const esHit = (p.likes ?? 0) > 1000
 
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => onSeleccionar?.(p)}
-              className="aspect-square rounded-sm border border-gray-200 bg-white p-2 flex flex-col items-center text-center overflow-hidden active:scale-[0.98] transition"
+              className="relative aspect-square rounded-sm border border-gray-200 p-2 flex flex-col items-center text-center overflow-hidden active:scale-[0.98] transition"
+              style={{
+                background: esHit ? '#F3EBFA' : '#fff'
+              }}
             >
+              {p.likes != null && (
+                <span className="absolute top-1 right-1.5 text-[0.45rem] text-gray-400 leading-none flex items-center gap-0.5">
+                  <span className="text-[0.55rem] leading-none">
+                    ♥
+                  </span>
+                  <span>{p.likes}</span>
+                </span>
+              )}
               <div className="flex-1 flex flex-col items-center justify-center gap-1.5 w-full min-h-0">
                 <span className="text-2xl leading-none shrink-0">
                   {emojiFormato(p.formato)}
