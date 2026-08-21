@@ -7,6 +7,10 @@ import {
   formatearFechaInsumo,
   formatearMoneda
 } from '../../../scr/lib/insumosUtils'
+import type {
+  InventarioKitLocal,
+  MovimientoKitLocal
+} from '../../../scr/lib/inventarioKitsLocal'
 import {
   type EstadisticasComision,
   type PuntoEntrega,
@@ -21,13 +25,23 @@ function formatearPorcentaje(valor: number | null) {
   return `${valor.toFixed(1)}%`
 }
 
+type KitOpcion = { id: string; nombre: string }
+
+type LineaCarga = {
+  kit_id: string
+  cantidad: string
+}
+
 export default function LocalDetalle({
   punto: puntoInicial,
   ventasIniciales,
   totalIngresos: ingresosInicial,
   totalComision: comisionInicial,
   totalKits: kitsInicial,
-  estadisticasComision: statsInicial
+  estadisticasComision: statsInicial,
+  inventarioInicial = [],
+  movimientosIniciales = [],
+  kitsDisponibles = []
 }: {
   punto: PuntoEntrega
   ventasIniciales: VentaLocal[]
@@ -35,6 +49,9 @@ export default function LocalDetalle({
   totalComision: number
   totalKits: number
   estadisticasComision: EstadisticasComision
+  inventarioInicial?: InventarioKitLocal[]
+  movimientosIniciales?: MovimientoKitLocal[]
+  kitsDisponibles?: KitOpcion[]
 }) {
   const router = useRouter()
   const [punto, setPunto] = useState(puntoInicial)
@@ -47,6 +64,12 @@ export default function LocalDetalle({
     useState(kitsInicial)
   const [estadisticas, setEstadisticas] =
     useState(statsInicial)
+  const [inventario, setInventario] = useState(
+    inventarioInicial
+  )
+  const [movimientos, setMovimientos] = useState(
+    movimientosIniciales
+  )
   const [desde, setDesde] = useState('')
   const [hasta, setHasta] = useState('')
   const [modoHistorico, setModoHistorico] =
@@ -67,6 +90,22 @@ export default function LocalDetalle({
     tipo: 'ok' | 'error'
     texto: string
   } | null>(null)
+  const [formCargaAbierto, setFormCargaAbierto] =
+    useState(false)
+  const [fechaCarga, setFechaCarga] = useState(
+    () => new Date().toISOString().split('T')[0]
+  )
+  const [notasCarga, setNotasCarga] = useState('')
+  const [lineasCarga, setLineasCarga] = useState<
+    LineaCarga[]
+  >([{ kit_id: '', cantidad: '1' }])
+  const [guardandoCarga, setGuardandoCarga] =
+    useState(false)
+
+  const totalKitsInventario = inventario.reduce(
+    (s, i) => s + i.cantidad,
+    0
+  )
 
   async function aplicarFiltro() {
     setCargando(true)
@@ -231,6 +270,70 @@ export default function LocalDetalle({
     }
   }
 
+  async function guardarCargaInventario() {
+    const kits = lineasCarga
+      .filter((l) => l.kit_id && Number(l.cantidad) > 0)
+      .map((l) => ({
+        kit_id: l.kit_id,
+        cantidad: Number(l.cantidad)
+      }))
+
+    if (!kits.length) {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Agrega al menos un kit'
+      })
+      return
+    }
+
+    setGuardandoCarga(true)
+    setMensaje(null)
+
+    try {
+      const res = await fetch(
+        `/api/locales/${punto.id}/inventario`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fecha: fechaCarga,
+            notas: notasCarga || null,
+            kits
+          })
+        }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setMensaje({
+          tipo: 'error',
+          texto: data.error || 'No se pudo cargar'
+        })
+        return
+      }
+
+      setFormCargaAbierto(false)
+      setLineasCarga([{ kit_id: '', cantidad: '1' }])
+      setNotasCarga('')
+      setMensaje({
+        tipo: 'ok',
+        texto: 'Inventario cargado'
+      })
+      router.refresh()
+      window.location.reload()
+    } catch {
+      setMensaje({
+        tipo: 'error',
+        texto: 'Error de conexión'
+      })
+    } finally {
+      setGuardandoCarga(false)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#fafafa]">
       <div className="max-w-md mx-auto px-5 pt-8 pb-24">
@@ -358,6 +461,183 @@ export default function LocalDetalle({
                   Cancelar
                 </button>
               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="editorial-card mb-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p className="customer-name text-black">
+                Inventario en local
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {totalKitsInventario} kit
+                {totalKitsInventario === 1 ? '' : 's'}{' '}
+                disponibles
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setFormCargaAbierto((v) => !v)
+              }
+              className="shrink-0 text-xs font-semibold px-3 py-2 rounded-lg border"
+              style={{
+                background: formCargaAbierto
+                  ? '#111'
+                  : '#fff',
+                color: formCargaAbierto ? '#fff' : '#111'
+              }}
+            >
+              {formCargaAbierto ? 'Cerrar' : 'Cargar kits'}
+            </button>
+          </div>
+
+          {formCargaAbierto && (
+            <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-[#fafafa] p-3">
+              <label className="block">
+                <span className="text-xs text-gray-500">
+                  Fecha de carga
+                </span>
+                <input
+                  type="date"
+                  value={fechaCarga}
+                  onChange={(e) =>
+                    setFechaCarga(e.target.value)
+                  }
+                  className={`${inputClass} mt-1`}
+                />
+              </label>
+
+              {lineasCarga.map((linea, idx) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-[1fr_72px] gap-2"
+                >
+                  <select
+                    value={linea.kit_id}
+                    onChange={(e) => {
+                      const next = [...lineasCarga]
+                      next[idx] = {
+                        ...next[idx],
+                        kit_id: e.target.value
+                      }
+                      setLineasCarga(next)
+                    }}
+                    className={inputClass}
+                  >
+                    <option value="">Kit...</option>
+                    {kitsDisponibles.map((kit) => (
+                      <option key={kit.id} value={kit.id}>
+                        {kit.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    value={linea.cantidad}
+                    onChange={(e) => {
+                      const next = [...lineasCarga]
+                      next[idx] = {
+                        ...next[idx],
+                        cantidad: e.target.value
+                      }
+                      setLineasCarga(next)
+                    }}
+                    className={inputClass}
+                  />
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setLineasCarga((prev) => [
+                    ...prev,
+                    { kit_id: '', cantidad: '1' }
+                  ])
+                }
+                className="text-xs text-gray-500 underline"
+              >
+                + Agregar otro kit
+              </button>
+
+              <input
+                type="text"
+                placeholder="Nota (opcional)"
+                value={notasCarga}
+                onChange={(e) =>
+                  setNotasCarga(e.target.value)
+                }
+                className={inputClass}
+              />
+
+              <button
+                type="button"
+                onClick={guardarCargaInventario}
+                disabled={guardandoCarga}
+                className="w-full rounded-lg py-2.5 text-sm text-white font-semibold disabled:opacity-50"
+                style={{ background: '#c6302c' }}
+              >
+                {guardandoCarga
+                  ? 'Guardando...'
+                  : 'Guardar carga'}
+              </button>
+            </div>
+          )}
+
+          {inventario.length === 0 ? (
+            <p className="text-sm text-gray-400">
+              Aún no hay kits en este local. Carga cuando
+              los dejes.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {inventario.map((item) => (
+                <li
+                  key={item.kit_id}
+                  className="flex items-center justify-between gap-3 text-sm rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                >
+                  <span
+                    className="font-medium"
+                    style={{ color: '#c6302c' }}
+                  >
+                    {item.kit_nombre}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-md bg-[#FFF7E6] text-[#D48806]">
+                    {item.cantidad}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {movimientos.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-gray-100">
+              <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 mb-2">
+                Últimos movimientos
+              </p>
+              <ul className="space-y-1.5">
+                {movimientos.slice(0, 6).map((mov) => (
+                  <li
+                    key={mov.id}
+                    className="flex justify-between gap-2 text-xs text-gray-500"
+                  >
+                    <span>
+                      {formatearFechaInsumo(mov.fecha)} ·{' '}
+                      {mov.tipo === 'entrada' ? '+' : '−'}
+                      {mov.cantidad} {mov.kit_nombre}
+                    </span>
+                    <span className="shrink-0">
+                      {mov.tipo === 'entrada'
+                        ? 'Carga'
+                        : 'Venta'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

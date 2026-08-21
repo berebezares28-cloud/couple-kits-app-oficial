@@ -77,7 +77,7 @@ export async function PATCH(
     if (!resultado.ok) {
       return Response.json(
         { error: resultado.error },
-        { status: 500 }
+        { status: 400 }
       )
     }
 

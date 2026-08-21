@@ -1,4 +1,8 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import {
+  descontarInventarioPorVentaLocal,
+  devolverInventarioPorVentaLocal
+} from './inventarioKitsLocal'
 
 export type PuntoEntrega = {
   id: string
@@ -485,6 +489,28 @@ export async function registrarVentaLocalBulk(
     return { ok: false, error: kitsError.message }
   }
 
+  const descuento = await descontarInventarioPorVentaLocal(
+    supabase,
+    {
+      punto_entrega_id: params.punto_entrega_id,
+      venta_local_id: venta.id,
+      fecha: params.fecha,
+      kits: lineas.map((l) => ({
+        kit_id: l.kit_id,
+        cantidad: l.cantidad
+      }))
+    }
+  )
+
+  if (!descuento.ok) {
+    await supabase
+      .from('ventas_local')
+      .delete()
+      .eq('id', venta.id)
+
+    return { ok: false, error: descuento.error }
+  }
+
   return { ok: true, ventaId: venta.id }
 }
 
@@ -541,6 +567,48 @@ export async function actualizarVentaLocalBulk(
       ok: false,
       error: 'Agrega al menos un kit'
     }
+  }
+
+  const ventaActual = await obtenerVentaLocalBulk(
+    supabase,
+    ventaId
+  )
+
+  if (!ventaActual) {
+    return { ok: false, error: 'Venta no encontrada' }
+  }
+
+  const devolucion = await devolverInventarioPorVentaLocal(
+    supabase,
+    ventaId
+  )
+
+  if (!devolucion.ok) {
+    return devolucion
+  }
+
+  const precheck = await descontarInventarioPorVentaLocal(
+    supabase,
+    {
+      punto_entrega_id: ventaActual.punto_entrega_id,
+      venta_local_id: ventaId,
+      fecha: params.fecha,
+      kits: params.kits
+    }
+  )
+
+  if (!precheck.ok) {
+    await descontarInventarioPorVentaLocal(supabase, {
+      punto_entrega_id: ventaActual.punto_entrega_id,
+      venta_local_id: ventaId,
+      fecha: ventaActual.fecha,
+      kits: ventaActual.kits.map((k) => ({
+        kit_id: k.kit_id,
+        cantidad: k.cantidad
+      }))
+    })
+
+    return { ok: false, error: precheck.error }
   }
 
   const kitIds = params.kits.map((k) => k.kit_id)
@@ -618,6 +686,15 @@ export async function eliminarVentaLocalBulk(
   supabase: SupabaseClient,
   ventaId: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const devolucion = await devolverInventarioPorVentaLocal(
+    supabase,
+    ventaId
+  )
+
+  if (!devolucion.ok) {
+    return devolucion
+  }
+
   const { error } = await supabase
     .from('ventas_local')
     .delete()

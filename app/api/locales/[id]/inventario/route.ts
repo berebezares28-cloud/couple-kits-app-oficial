@@ -1,29 +1,16 @@
-import { registrarVentaLocalBulk } from '../../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../../scr/lib/supabase'
+import { registrarEntradaKitsLocal } from '../../../../../scr/lib/inventarioKitsLocal'
+import { supabase } from '../../../../../scr/lib/supabase'
 
-export async function POST(req: Request) {
+export async function POST(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const body = await req.json()
-
-    if (!body.punto_entrega_id) {
-      return Response.json(
-        { error: 'Selecciona un local' },
-        { status: 400 }
-      )
-    }
 
     if (!Array.isArray(body.kits) || body.kits.length === 0) {
       return Response.json(
         { error: 'Agrega al menos un kit' },
-        { status: 400 }
-      )
-    }
-
-    const comision = Number(body.comision_monto)
-
-    if (Number.isNaN(comision) || comision < 0) {
-      return Response.json(
-        { error: 'Comisión inválida' },
         { status: 400 }
       )
     }
@@ -37,7 +24,6 @@ export async function POST(req: Request) {
       }
 
       const cantidad = Number(kit.cantidad)
-
       if (!cantidad || cantidad <= 0) {
         return Response.json(
           { error: 'Cantidad inválida' },
@@ -50,14 +36,12 @@ export async function POST(req: Request) {
       body.fecha ??
       new Date().toISOString().split('T')[0]
 
-    const resultado = await registrarVentaLocalBulk(
+    const resultado = await registrarEntradaKitsLocal(
       supabase,
       {
-        punto_entrega_id: body.punto_entrega_id,
+        punto_entrega_id: params.id,
         fecha,
-        comision_monto: comision,
-        metodo_pago: body.metodo_pago,
-        notas: body.notas,
+        notas: body.notas ?? null,
         kits: body.kits.map(
           (k: { kit_id: string; cantidad: number }) => ({
             kit_id: k.kit_id,
@@ -74,14 +58,11 @@ export async function POST(req: Request) {
       )
     }
 
-    return Response.json({
-      success: true,
-      ventaId: resultado.ventaId
-    })
+    return Response.json({ success: true })
   } catch (error) {
     console.error(error)
     return Response.json(
-      { error: 'Error registrando venta' },
+      { error: 'Error cargando inventario' },
       { status: 500 }
     )
   }

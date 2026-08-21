@@ -1,5 +1,9 @@
 import { notFound } from 'next/navigation'
 import {
+  listarInventarioKitsLocal,
+  listarMovimientosKitsLocal
+} from '../../../scr/lib/inventarioKitsLocal'
+import {
   calcularEstadisticasComision,
   obtenerHistorialPunto,
   obtenerPuntoEntrega
@@ -22,10 +26,17 @@ export default async function LocalPage({
     notFound()
   }
 
-  const historial = await obtenerHistorialPunto(
-    supabase,
-    params.id
-  )
+  const [historial, inventario, movimientos, kitsResult] =
+    await Promise.all([
+      obtenerHistorialPunto(supabase, params.id),
+      listarInventarioKitsLocal(supabase, params.id),
+      listarMovimientosKitsLocal(supabase, params.id, 15),
+      supabase
+        .from('kits')
+        .select('id, nombre')
+        .eq('activo', true)
+        .order('nombre')
+    ])
 
   const estadisticasComision = calcularEstadisticasComision(
     historial
@@ -39,6 +50,9 @@ export default async function LocalPage({
       totalComision={historial.totalComision}
       totalKits={historial.totalKits}
       estadisticasComision={estadisticasComision}
+      inventarioInicial={inventario}
+      movimientosIniciales={movimientos}
+      kitsDisponibles={kitsResult.data ?? []}
     />
   )
 }
