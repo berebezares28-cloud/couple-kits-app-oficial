@@ -4,6 +4,7 @@ import {
   buscarPuntoEntregaPorLugar,
   listarPuntosEntrega
 } from '../../../scr/lib/puntosEntrega'
+import { resolverKitsDesdeCamposTally, extraerCandidatosKit } from '../../../scr/lib/resolverKitsTally'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -83,10 +84,6 @@ export async function POST(req: Request) {
     const horaEntrega =
       getField(fields, 'Hora')?.value ?? null
 
-    const kitsSeleccionados = getMultiSelectTexts(
-      getField(fields, '¿Cuál es tu kit?')
-    )
-
     const puntosEntrega = await listarPuntosEntrega(supabase)
     const puntoLocal = buscarPuntoEntregaPorLugar(
       lugarEntrega,
@@ -121,29 +118,30 @@ export async function POST(req: Request) {
     }
 
     const pedidoId = pedidoCreado.id
-    const kitsParaInsertar: {
-      kit_id: string
-      cantidad: number
-    }[] = []
 
-    for (const nombreKit of kitsSeleccionados) {
-      const { data: kit, error: kitError } = await supabase
+    const { data: kitsCatalogo, error: kitsError } =
+      await supabase
         .from('kits')
-        .select('id')
-        .eq('nombre', nombreKit)
-        .single()
+        .select('id, nombre')
+        .eq('activo', true)
 
-      if (kitError || !kit) {
-        console.error(
-          `No se encontró kit: ${nombreKit}`
-        )
-        continue
-      }
+    if (kitsError) {
+      console.error(
+        'Error cargando catálogo de kits:',
+        kitsError
+      )
+    }
 
-      kitsParaInsertar.push({
-        kit_id: kit.id,
-        cantidad: 1
-      })
+    const kitsParaInsertar = resolverKitsDesdeCamposTally(
+      fields,
+      kitsCatalogo ?? []
+    )
+
+    if (kitsParaInsertar.length === 0) {
+      console.error(
+        'No se encontraron kits en la respuesta de Tally',
+        extraerCandidatosKit(fields)
+      )
     }
 
     if (kitsParaInsertar.length > 0) {

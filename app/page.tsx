@@ -239,10 +239,17 @@ export default async function Home() {
                     (pk: any) =>
                       pk.pedido_id === pedido.id
                   )
-                  .map(
-                    (pk: any) =>
-                      (pk.kits as any)?.nombre
-                  )
+                  .map((pk: any) => {
+                    const kit = pk.kits as
+                      | { nombre?: string }
+                      | { nombre?: string }[]
+                      | null
+                    const nombre = Array.isArray(kit)
+                      ? kit[0]?.nombre
+                      : kit?.nombre
+
+                    return nombre
+                  })
                   .filter(Boolean)
                   .join(', ') ?? ''
 
