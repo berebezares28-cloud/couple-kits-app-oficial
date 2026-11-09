@@ -50,9 +50,11 @@ export function calcularDisponibilidadFiguras(datos: DatosFiguras) {
     const abierto = ['Pendiente', 'Confirmado'].includes(pedido.estatus)
     const entregadoDirecto = pedido.estatus === 'Entregado' && !pedido.punto_entrega_id
     if (!abierto && !entregadoDirecto) continue
-    // Respeta las recetas guardadas en los pedidos. Para pendientes antiguos
-    // sin snapshot se utiliza la receta del catálogo actual.
-    const componentes = snapshots.get(linea.id) ?? (abierto ? recetas.get(linea.kit_id) ?? [] : [])
+    // La preparación pendiente sigue siempre la receta vigente del catálogo.
+    // Solo el consumo ya entregado conserva la receta histórica del pedido.
+    const componentes = abierto
+      ? recetas.get(linea.kit_id) ?? []
+      : snapshots.get(linea.id) ?? []
     for (const c of componentes) {
       if (!figuras.has(c.insumo_id)) continue
       const cantidad = Number(c.cantidad) * (Number(linea.cantidad) || 1)
