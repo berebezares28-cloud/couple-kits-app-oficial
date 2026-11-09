@@ -89,7 +89,7 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pb-24">
+      <div className="max-w-md md:max-w-3xl lg:max-w-7xl mx-auto px-5 lg:px-8 pb-24 lg:pb-10">
 
         {/* HEADER */}
 
@@ -137,7 +137,7 @@ export default async function Home() {
 
         {/* MÉTRICAS */}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
 
           <Link
             href="/pedidos?estatus=Pendiente"
@@ -199,7 +199,7 @@ export default async function Home() {
 
         </div>
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-8 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-5">
           <Link
             href="/pedidos/resumen"
             className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
@@ -250,6 +250,7 @@ export default async function Home() {
             PEDIDOS RECIENTES
           </h2>
 
+          <div className="md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-5">
           {pedidos?.length ? (
             pedidos.map((pedido: any) => {
 
@@ -282,7 +283,7 @@ export default async function Home() {
                 <Link
                   key={pedido.id}
                   href={`/pedidos/${pedido.id}`}
-                  className="editorial-card mb-4 block hover:-translate-y-[1px] transition"
+                  className="editorial-card mb-4 md:mb-0 block hover:-translate-y-[1px] transition"
                 >
 
                   <div className="flex justify-between items-start">
@@ -343,6 +344,7 @@ export default async function Home() {
               No hay pedidos todavía
             </div>
           )}
+          </div>
 
         </div>
 

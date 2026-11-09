@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        {children}
+        <div className="lg:pl-60">{children}</div>
         <BottomNav />
       </body>
     </html>

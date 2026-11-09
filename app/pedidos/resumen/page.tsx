@@ -45,9 +45,9 @@ export default async function ResumenPedidosPage({
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pt-8 pb-24">
+      <div className="max-w-md md:max-w-3xl lg:max-w-7xl mx-auto px-5 lg:px-8 pt-8 pb-24 lg:pb-10">
         <Link href="/" className="text-sm text-gray-500 hover:text-black">← Inicio</Link>
-        <h1 className="editorial-title mt-6" style={{ color: '#c6302c', fontSize: '2.5rem' }}>
+        <h1 className="editorial-title mt-6" style={{ color: '#c6302c', fontSize: 'clamp(2.5rem, 4vw, 3.5rem)' }}>
           RESUMEN DE PEDIDOS
         </h1>
         <p className="text-sm text-gray-500 mt-3 mb-6">
@@ -58,7 +58,8 @@ export default async function ResumenPedidosPage({
           La disponibilidad de figuras considera todos los pedidos pendientes y confirmados, de cualquier fecha y lugar. No incluye empaques ni consumibles.
         </p>
 
-        <form action="/pedidos/resumen" method="get" className="editorial-card mb-6">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:mb-8">
+        <form action="/pedidos/resumen" method="get" className="editorial-card mb-6 lg:mb-0">
           <label htmlFor="fecha-entrega" className="block text-sm font-semibold mb-2">
             Fecha de entrega
           </label>
@@ -69,20 +70,20 @@ export default async function ResumenPedidosPage({
             Ver resumen
           </button>
         </form>
-
-        {error ? <p role="alert" className="editorial-card text-red-700">{error}</p> : (
-          <>
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="editorial-card">
+        {!error && (<div className="grid grid-cols-2 gap-3 mb-6 lg:mb-0">
+              <div className="editorial-card lg:flex lg:flex-col lg:justify-center">
                 <p className="metric-label">Kits por preparar</p>
                 <p className="metric-value" style={{ color: '#c6302c' }}>{totalKits}</p>
               </div>
-              <div className="editorial-card">
+              <div className="editorial-card lg:flex lg:flex-col lg:justify-center">
                 <p className="metric-label">Pedidos</p>
                 <p className="metric-value">{totalPedidos}</p>
               </div>
-            </div>
+            </div>)}
+        </div>
 
+        {error ? <p role="alert" className="editorial-card text-red-700">{error}</p> : (
+          <>
             {errorDisponibilidad && <p role="alert" className="text-sm text-amber-700 mb-4">{errorDisponibilidad}</p>}
 
             {grupos.length === 0 && (
@@ -91,8 +92,9 @@ export default async function ResumenPedidosPage({
               </p>
             )}
 
+            <div className="md:grid md:grid-cols-2 xl:grid-cols-3 md:gap-5 md:items-start">
             {grupos.map((grupo) => (
-              <section key={grupo.lugar} className="editorial-card mb-5" aria-label={grupo.lugar}>
+              <section key={grupo.lugar} className="editorial-card mb-5 md:mb-0" aria-label={grupo.lugar}>
                 <h2 className="customer-name">📍 {grupo.lugar}</h2>
                 <p className="text-xs text-gray-500 mt-1 mb-4">
                   {grupo.pedidos} {grupo.pedidos === 1 ? 'pedido' : 'pedidos'} · {grupo.cantidad} {grupo.cantidad === 1 ? 'kit' : 'kits'}
@@ -127,6 +129,7 @@ export default async function ResumenPedidosPage({
                 )}
               </section>
             ))}
+            </div>
           </>
         )}
       </div>

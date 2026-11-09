@@ -118,6 +118,23 @@ function getStatusStyle(status: string) {
   }
 }
 
+function SelectorEstatus({ pedido, onChange }: {
+  pedido: Pedido
+  onChange: (pedidoId: string, estatus: string) => void
+}) {
+  const style = getStatusStyle(pedido.estatus)
+  return (
+    <select aria-label={`Estatus del pedido de ${pedido.nombre}`}
+      value={pedido.estatus} onChange={(e) => onChange(pedido.id, e.target.value)}
+      className="relative z-10 text-xs border rounded-lg p-2"
+      style={{ background: style.background, color: style.color }}>
+      {ESTATUS_PEDIDOS.filter((estado) => estado !== 'Todos').map((estado) => (
+        <option key={estado} value={estado}>{estado}</option>
+      ))}
+    </select>
+  )
+}
+
 export default function PedidosClient({
   pedidosIniciales,
   pedidosEliminadosIniciales = []
@@ -589,7 +606,7 @@ export default function PedidosClient({
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pb-24">
+      <div className="max-w-md md:max-w-3xl lg:max-w-7xl mx-auto px-5 lg:px-8 pb-24 lg:pb-10">
 
         <div className="pt-8 pb-4">
 
@@ -616,6 +633,7 @@ export default function PedidosClient({
 
         </div>
 
+        <div className="lg:flex lg:items-start lg:gap-4">
         <input
           type="search"
           placeholder="Buscar..."
@@ -623,11 +641,11 @@ export default function PedidosClient({
           onChange={(e) =>
             setBusqueda(e.target.value)
           }
-          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-2 text-sm"
+          className="w-full lg:max-w-xl border border-gray-200 rounded-xl px-4 py-2.5 mb-2 text-sm"
           autoComplete="off"
         />
 
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 lg:flex-1 lg:min-w-0">
           <button
             type="button"
             onClick={() =>
@@ -689,6 +707,8 @@ export default function PedidosClient({
               </button>
             )}
           </div>
+        </div>
+
         </div>
 
         <p className="text-sm text-gray-500 mb-3">
@@ -890,17 +910,13 @@ export default function PedidosClient({
           </div>
         )}
 
+        <div className="md:grid md:grid-cols-2 md:gap-4 lg:hidden">
         {pedidosFiltrados.map(
           (pedido) => {
-            const statusStyle =
-              getStatusStyle(
-                pedido.estatus
-              )
-
             return (
               <article
                 key={pedido.id}
-                className="relative editorial-card mb-4 hover:-translate-y-[1px] transition"
+                className="relative editorial-card mb-4 md:mb-0 hover:-translate-y-[1px] transition"
               >
 
                 <div className="flex justify-between items-start">
@@ -920,42 +936,7 @@ export default function PedidosClient({
                     </p>
                   </div>
 
-                  <select
-                    aria-label={`Estatus del pedido de ${pedido.nombre}`}
-                    value={
-                      pedido.estatus
-                    }
-                    onChange={(e) => {
-                      actualizarEstatus(
-                        pedido.id,
-                        e.target.value
-                      )
-                    }}
-                    className="relative z-10 text-xs border rounded-lg p-2"
-                    style={{
-                      background:
-                        statusStyle.background,
-                      color:
-                        statusStyle.color
-                    }}
-                  >
-                    <option value="Pendiente">
-                      Pendiente
-                    </option>
-
-                    <option value="Confirmado">
-                      Confirmado
-                    </option>
-
-                    <option value="Entregado">
-                      Entregado
-                    </option>
-
-                    <option value="Cancelado">
-                      Cancelado
-                    </option>
-
-                  </select>
+                  <SelectorEstatus pedido={pedido} onChange={actualizarEstatus} />
 
                 </div>
 
@@ -987,6 +968,38 @@ export default function PedidosClient({
             )
           }
         )}
+
+        </div>
+
+        <div className="hidden lg:block overflow-x-auto rounded-2xl border-2 border-black shadow-[4px_4px_0_#000]">
+          <table className="w-full min-w-[760px] text-sm text-left">
+            <caption className="sr-only">Pedidos filtrados</caption>
+            <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500 border-b-2 border-black">
+              <tr>
+                {['Cliente', 'Kits', 'Entrega', 'Lugar', 'Estatus', 'Detalle'].map((col) => <th key={col} scope="col" className="px-4 py-4 font-semibold">{col}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {pedidosFiltrados.map((pedido) => (
+                <tr key={pedido.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-4 max-w-[220px]">
+                    <Link className="font-bold hover:underline" href={`/pedidos/${pedido.id}`}>{pedido.nombre}</Link>
+                    <p className="text-xs text-gray-500 mt-1">@{pedido.instagram}</p>
+                  </td>
+                  <td className="px-4 py-4 max-w-[220px] text-[#c6302c] font-medium">{pedido.kits.join(', ') || 'Sin kits'}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">
+                    <p>{formatearFechaEntrega(pedido.fecha_entrega)}</p>
+                    <p className="text-xs text-gray-500 mt-1">{pedido.hora_entrega || 'Sin hora'}</p>
+                  </td>
+                  <td className="px-4 py-4 max-w-[180px]">{pedido.lugar_entrega || 'Sin lugar'}</td>
+                  <td className="px-4 py-4"><SelectorEstatus pedido={pedido} onChange={actualizarEstatus} /></td>
+                  <td className="px-4 py-4"><Link className="font-semibold text-[#c6302c] hover:underline" href={`/pedidos/${pedido.id}`} aria-label={`Ver pedido de ${pedido.nombre}`}>Ver →</Link></td>
+                </tr>
+              ))}
+              {pedidosFiltrados.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">No hay pedidos que coincidan con estos filtros.</td></tr>}
+            </tbody>
+          </table>
+        </div>
 
         <div className="mt-10 border-t border-gray-100 pt-8">
           <button
