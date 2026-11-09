@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { obtenerDisponibilidadFiguras, type DisponibilidadFigura } from '../../../scr/lib/disponibilidadFiguras'
 import { supabase } from '../../../scr/lib/supabase'
 import { obtenerResumenPedidos, type ResumenLugar } from '../../../scr/lib/resumenPedidos'
 
@@ -20,11 +21,20 @@ export default async function ResumenPedidosPage({
     !Number.isNaN(Date.parse(fecha)) &&
     new Date(fecha).toISOString().slice(0, 10) === fecha
   let grupos: ResumenLugar[] = []
+  let disponibilidad = new Map<string, DisponibilidadFigura[]>()
+  let errorDisponibilidad = ''
   let error = fechaValida ? '' : 'Selecciona una fecha válida.'
 
   if (fechaValida) {
     try {
       grupos = await obtenerResumenPedidos(supabase, fecha)
+      if (grupos.length) {
+        try {
+          disponibilidad = await obtenerDisponibilidadFiguras(supabase)
+        } catch {
+          errorDisponibilidad = 'No se pudo verificar el inventario. Intenta de nuevo.'
+        }
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar el resumen.'
     }
@@ -42,6 +52,10 @@ export default async function ResumenPedidosPage({
         </h1>
         <p className="text-sm text-gray-500 mt-3 mb-6">
           Pedidos pendientes y confirmados, agrupados por lugar de entrega.
+        </p>
+
+        <p className="text-xs text-gray-500 mb-5">
+          La disponibilidad de figuras considera todos los pedidos pendientes y confirmados, de cualquier fecha y lugar. No incluye empaques ni consumibles.
         </p>
 
         <form action="/pedidos/resumen" method="get" className="editorial-card mb-6">
@@ -69,6 +83,8 @@ export default async function ResumenPedidosPage({
               </div>
             </div>
 
+            {errorDisponibilidad && <p role="alert" className="text-sm text-amber-700 mb-4">{errorDisponibilidad}</p>}
+
             {grupos.length === 0 && (
               <p className="editorial-card text-sm text-gray-500">
                 No hay pedidos pendientes ni confirmados para esta fecha.
@@ -84,7 +100,20 @@ export default async function ResumenPedidosPage({
                 <ul className="divide-y divide-gray-100">
                   {grupo.kits.map((kit) => (
                     <li key={kit.id} className="flex items-center justify-between gap-3 py-3">
-                      <span className="text-sm font-medium">{kit.nombre}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium">{kit.nombre}</span>
+                        {errorDisponibilidad ? (
+                          <p className="text-xs text-amber-700 mt-1">(Disponibilidad no verificada)</p>
+                        ) : disponibilidad.get(kit.id)?.length ? (
+                          disponibilidad.get(kit.id)!.map((figura) => (
+                            <p key={figura.id} className={`text-xs mt-1 ${figura.suficiente ? 'text-green-700' : 'text-red-700'}`}>
+                              ({figura.nombre}: {figura.suficiente ? 'suficientes disponibles' : 'no hay suficientes disponibles'} · {figura.disponibles} disponibles / {figura.necesarios} necesarios en total)
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-1">(Sin figura principal registrada)</p>
+                        )}
+                      </div>
                       <span className="shrink-0 rounded-lg bg-[#FFF1F0] text-[#c6302c] px-3 py-1 text-sm font-bold">
                         × {kit.cantidad}
                       </span>
