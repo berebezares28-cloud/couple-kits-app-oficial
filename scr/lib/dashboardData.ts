@@ -73,6 +73,7 @@ export type DashboardData = {
   tendencia: PuntoMes[]
   statusPedidos: {
     pendiente: number
+    confirmado: number
     entregado: number
     cancelado: number
   }
@@ -395,6 +396,7 @@ export async function obtenerDashboardData(
 
   const statusPedidos = {
     pendiente: 0,
+    confirmado: 0,
     entregado: 0,
     cancelado: 0
   }
@@ -402,6 +404,7 @@ export async function obtenerDashboardData(
   for (const p of statusResult.data ?? []) {
     const e = p.estatus ?? 'Pendiente'
     if (e === 'Pendiente') statusPedidos.pendiente++
+    else if (e === 'Confirmado') statusPedidos.confirmado++
     else if (e === 'Entregado') statusPedidos.entregado++
     else if (e === 'Cancelado') statusPedidos.cancelado++
   }

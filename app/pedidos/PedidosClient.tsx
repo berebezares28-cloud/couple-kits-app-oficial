@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '../../scr/lib/supabase'
 import {
   DIAS_RETENCION_PEDIDOS_ELIMINADOS,
@@ -22,6 +22,7 @@ type Pedido = {
   fecha_entrega: string
   hora_entrega: string
   estatus: string
+  nota: string | null
   kitLineas: KitLinea[]
   kits: string[]
   eliminado_at?: string | null
@@ -33,6 +34,12 @@ type ResumenPrepararGrupo = {
   fechaEtiqueta: string
   lineas: { kit: string; cantidad: number }[]
 }
+
+const FILTROS_PEDIDOS_KEY = 'couple-kits:pedidos:filtros:v1'
+const ESTATUS_PEDIDOS = [
+  'Todos', 'Pendiente', 'Confirmado', 'Entregado', 'Cancelado'
+]
+const RANGOS_FECHA = ['Todas', 'Hoy', 'Mañana', 'Esta semana']
 
 function formatearFechaEntrega(fecha: string): string {
   if (!fecha) return 'Sin fecha'
@@ -85,6 +92,12 @@ function getStatusStyle(status: string) {
         color: '#D48806'
       }
 
+    case 'Confirmado':
+      return {
+        background: '#E6F4FF',
+        color: '#0958D9',
+      }
+
     case 'Entregado':
       return {
         background: '#F6FFED',
@@ -113,6 +126,7 @@ export default function PedidosClient({
   pedidosEliminadosIniciales?: Pedido[]
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const searchParams = useSearchParams()
 
   const [busqueda, setBusqueda] =
@@ -124,8 +138,11 @@ export default function PedidosClient({
   const [filtroFecha, setFiltroFecha] =
     useState('Todas')
 
-    const [fechaSeleccionada, setFechaSeleccionada] =
+  const [fechaSeleccionada, setFechaSeleccionada] =
     useState('')
+
+  const [filtrosRestaurados, setFiltrosRestaurados] =
+    useState(false)
 
   const [pedidos, setPedidos] =
     useState(pedidosIniciales)
@@ -152,9 +169,20 @@ export default function PedidosClient({
   const hayFiltrosActivos =
     busqueda !== '' || cantidadFiltrosActivos > 0
 
+  function cambiarFiltro(nuevoFiltro: string) {
+    setFiltro(nuevoFiltro)
+
+    const estatusUrl = searchParams.get('estatus')
+    if (estatusUrl && estatusUrl !== nuevoFiltro) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('estatus', nuevoFiltro)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    }
+  }
+
   function limpiarFiltros() {
     setBusqueda('')
-    setFiltro('Todos')
+    cambiarFiltro('Todos')
     setFiltroFecha('Todas')
     setFechaSeleccionada('')
     setPanelFiltrosAbierto(false)
@@ -180,6 +208,7 @@ export default function PedidosClient({
       fecha_entrega: string
       hora_entrega: string
       estatus: string
+      nota: string | null
       eliminado_at?: string | null
     }[]
   ): Promise<Pedido[]> {
@@ -228,6 +257,7 @@ export default function PedidosClient({
         fecha_entrega: pedido.fecha_entrega,
         hora_entrega: pedido.hora_entrega,
         estatus: pedido.estatus,
+        nota: pedido.nota ?? null,
         eliminado_at: pedido.eliminado_at ?? null,
         kitLineas: lineasPedido,
         kits: lineasPedido.map((l) =>
@@ -298,20 +328,53 @@ export default function PedidosClient({
   }, [pedidosEliminadosIniciales])
 
   useEffect(() => {
+    try {
+      const guardados = JSON.parse(
+        sessionStorage.getItem(FILTROS_PEDIDOS_KEY) ?? 'null'
+      )
+
+      if (guardados && typeof guardados === 'object') {
+        if (typeof guardados.busqueda === 'string') {
+          setBusqueda(guardados.busqueda)
+        }
+        if (ESTATUS_PEDIDOS.includes(guardados.filtro)) {
+          setFiltro(guardados.filtro)
+        }
+        if (RANGOS_FECHA.includes(guardados.filtroFecha)) {
+          setFiltroFecha(guardados.filtroFecha)
+        }
+        if (
+          typeof guardados.fechaSeleccionada === 'string' &&
+          /^(\d{4}-\d{2}-\d{2})?$/.test(guardados.fechaSeleccionada)
+        ) {
+          setFechaSeleccionada(guardados.fechaSeleccionada)
+        }
+      }
+    } catch {
+      // La lista sigue funcionando si el navegador no permite guardar filtros.
+    }
+
     const estatus = searchParams.get('estatus')
 
-    if (
-      estatus &&
-      [
-        'Todos',
-        'Pendiente',
-        'Entregado',
-        'Cancelado'
-      ].includes(estatus)
-    ) {
+    if (estatus && ESTATUS_PEDIDOS.includes(estatus)) {
       setFiltro(estatus)
     }
+
+    setFiltrosRestaurados(true)
   }, [searchParams])
+
+  useEffect(() => {
+    if (!filtrosRestaurados) return
+
+    try {
+      sessionStorage.setItem(
+        FILTROS_PEDIDOS_KEY,
+        JSON.stringify({ busqueda, filtro, filtroFecha, fechaSeleccionada })
+      )
+    } catch {
+      // Guardar filtros es opcional para poder consultar y editar pedidos.
+    }
+  }, [busqueda, filtro, filtroFecha, fechaSeleccionada, filtrosRestaurados])
 
   const pedidosFiltrados = useMemo(() => {
     const q =
@@ -341,6 +404,9 @@ export default function PedidosClient({
           ?.toLowerCase()
           .includes(q) ||
         pedido.lugar_entrega
+          ?.toLowerCase()
+          .includes(q) ||
+        pedido.nota
           ?.toLowerCase()
           .includes(q) ||
         kits
@@ -403,7 +469,7 @@ export default function PedidosClient({
     >()
 
     for (const pedido of pedidos) {
-      if (pedido.estatus !== 'Pendiente') continue
+      if (!['Pendiente', 'Confirmado'].includes(pedido.estatus)) continue
 
       const lugar =
         pedido.lugar_entrega?.trim() || 'Sin lugar'
@@ -584,7 +650,7 @@ export default function PedidosClient({
             {filtro !== 'Todos' && (
               <button
                 type="button"
-                onClick={() => setFiltro('Todos')}
+                onClick={() => cambiarFiltro('Todos')}
                 className="shrink-0 px-2.5 py-1.5 rounded-full text-xs border bg-[#FFF1F0] text-[#c6302c] border-[#ffccc7] whitespace-nowrap"
               >
                 {filtro} ×
@@ -732,13 +798,14 @@ export default function PedidosClient({
                 {[
                   'Todos',
                   'Pendiente',
+                  'Confirmado',
                   'Entregado',
                   'Cancelado'
                 ].map((item) => (
                   <button
                     key={item}
                     type="button"
-                    onClick={() => setFiltro(item)}
+                    onClick={() => cambiarFiltro(item)}
                     className="min-h-[44px] px-3 py-2.5 rounded-xl text-sm font-medium border transition active:scale-[0.98]"
                     style={{
                       background:
@@ -831,17 +898,21 @@ export default function PedidosClient({
               )
 
             return (
-              <Link
+              <article
                 key={pedido.id}
-                href={`/pedidos/${pedido.id}`}
-                className="block editorial-card mb-4 hover:-translate-y-[1px] transition"
+                className="relative editorial-card mb-4 hover:-translate-y-[1px] transition"
               >
 
                 <div className="flex justify-between items-start">
 
                   <div>
                     <p className="customer-name">
-                      {pedido.nombre}
+                      <Link
+                        href={`/pedidos/${pedido.id}`}
+                        className="after:absolute after:inset-0 after:rounded-[inherit]"
+                      >
+                        {pedido.nombre}
+                      </Link>
                     </p>
 
                     <p className="customer-instagram">
@@ -850,21 +921,17 @@ export default function PedidosClient({
                   </div>
 
                   <select
+                    aria-label={`Estatus del pedido de ${pedido.nombre}`}
                     value={
                       pedido.estatus
                     }
                     onChange={(e) => {
-                      e.preventDefault()
-
                       actualizarEstatus(
                         pedido.id,
                         e.target.value
                       )
                     }}
-                    onClick={(e) =>
-                      e.stopPropagation()
-                    }
-                    className="text-xs border rounded-lg p-2"
+                    className="relative z-10 text-xs border rounded-lg p-2"
                     style={{
                       background:
                         statusStyle.background,
@@ -874,6 +941,10 @@ export default function PedidosClient({
                   >
                     <option value="Pendiente">
                       Pendiente
+                    </option>
+
+                    <option value="Confirmado">
+                      Confirmado
                     </option>
 
                     <option value="Entregado">
@@ -912,7 +983,7 @@ export default function PedidosClient({
 
                 </div>
 
-              </Link>
+              </article>
             )
           }
         )}

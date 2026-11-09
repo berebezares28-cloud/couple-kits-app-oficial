@@ -12,6 +12,7 @@ type PedidoRow = {
   fecha_entrega: string
   hora_entrega: string
   estatus: string
+  nota: string | null
   kitLineas: { nombre: string; cantidad: number }[]
   kits: string[]
   eliminado_at?: string | null
@@ -80,6 +81,7 @@ async function pedidosConKits(
         fecha_entrega: pedido.fecha_entrega ?? '',
         hora_entrega: pedido.hora_entrega ?? '',
         estatus: pedido.estatus ?? 'Pendiente',
+        nota: pedido.nota ?? null,
         eliminado_at: filtroEliminado
           ? pedido.eliminado_at ?? null
           : undefined,

@@ -14,6 +14,13 @@ function getStatusStyle(status: string) {
         border: '#FFE58F'
       }
 
+    case 'Confirmado':
+      return {
+        background: '#E6F4FF',
+        color: '#0958D9',
+        border: '#91CAFF',
+      }
+
     case 'Entregado':
       return {
         background: '#F6FFED',
@@ -193,6 +200,19 @@ export default async function Home() {
         </div>
 
         <div className="mt-8 space-y-3">
+          <Link
+            href="/pedidos/resumen"
+            className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
+          >
+            <div>
+              <p className="font-semibold">📋 Resumen de pedidos</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Kits por fecha y lugar de entrega
+              </p>
+            </div>
+            <span className="text-gray-400">→</span>
+          </Link>
+
           <Link
             href="/dashboard"
             className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"

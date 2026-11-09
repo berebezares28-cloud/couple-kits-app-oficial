@@ -56,6 +56,13 @@ function getStatusStyle(status: string) {
         border: '#FFE58F'
       }
 
+    case 'Confirmado':
+      return {
+        background: '#E6F4FF',
+        color: '#0958D9',
+        border: '#91CAFF',
+      }
+
     case 'Entregado':
       return {
         background: '#F6FFED',
@@ -484,6 +491,7 @@ export default function PedidoDetalle({
               }}
             >
               <option value="Pendiente">Pendiente</option>
+              <option value="Confirmado">Confirmado</option>
               <option value="Entregado">Entregado</option>
               <option value="Cancelado">Cancelado</option>
             </select>

@@ -146,6 +146,7 @@ export default function DashboardClient({
 
   const totalStatus =
     statusPedidos.pendiente +
+    statusPedidos.confirmado +
     statusPedidos.entregado +
     statusPedidos.cancelado
 
@@ -154,6 +155,11 @@ export default function DashboardClient({
       label: 'Pendiente',
       valor: statusPedidos.pendiente,
       color: '#D48806'
+    },
+    {
+      label: 'Confirmado',
+      valor: statusPedidos.confirmado,
+      color: '#0958D9'
     },
     {
       label: 'Entregado',
