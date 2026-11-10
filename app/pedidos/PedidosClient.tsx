@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '../../scr/lib/supabase'
+import { crearSupabaseBrowser } from '../../scr/lib/supabaseBrowser'
 import {
   DIAS_RETENCION_PEDIDOS_ELIMINADOS,
   diasRestantesParaPurga
@@ -142,6 +142,8 @@ export default function PedidosClient({
   pedidosIniciales: Pedido[]
   pedidosEliminadosIniciales?: Pedido[]
 }) {
+  const supabase = crearSupabaseBrowser()
+
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()

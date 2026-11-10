@@ -3,7 +3,7 @@ import {
   listarPuntosEntrega,
   obtenerVentaLocalBulk
 } from '../../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../../scr/lib/appAuth'
 import VentaBulkClient from '../VentaBulkClient'
 
 export const dynamic = 'force-dynamic'
@@ -13,6 +13,8 @@ export default async function EditarVentaBulkPage({
 }: {
   params: { id: string }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const venta = await obtenerVentaLocalBulk(
     supabase,
     params.id

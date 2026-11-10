@@ -5,9 +5,11 @@ import { listarInsumosConStock } from '../../../scr/lib/calcularStock'
 import {
   etiquetaCategoria
 } from '../../../scr/lib/insumosUtils'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 
 export default async function InsumosCriticosPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const insumos = await listarInsumosConStock(supabase)
 
   const criticos = insumos

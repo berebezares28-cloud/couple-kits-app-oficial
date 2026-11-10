@@ -4,7 +4,7 @@ import {
   obtenerRecetaKit,
   obtenerVentasDetalleKit
 } from '../../../scr/lib/kitsData'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import KitDetalle from './KitDetalle'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +14,8 @@ export default async function KitPage({
 }: {
   params: { id: string }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const kit = await obtenerKit(supabase, params.id)
 
   if (!kit) {

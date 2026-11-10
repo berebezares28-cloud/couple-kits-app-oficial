@@ -1,15 +1,21 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../scr/lib/appAuth'
 import {
   actualizarPuntoEntrega,
   eliminarPuntoEntrega,
   obtenerHistorialPunto,
   obtenerPuntoEntrega
 } from '../../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../../scr/lib/supabase'
 
 export async function GET(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const url = new URL(req.url)
     const desde = url.searchParams.get('desde') ?? undefined
@@ -47,6 +53,10 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 
@@ -86,6 +96,10 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(_req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const punto = await obtenerPuntoEntrega(
       supabase,

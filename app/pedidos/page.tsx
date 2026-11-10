@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { supabase } from '../../scr/lib/supabase'
+import { exigirAppPagina } from '../../scr/lib/appAuth'
 import PedidosClient from './PedidosClient'
 
 export const dynamic = 'force-dynamic'
@@ -19,6 +19,7 @@ type PedidoRow = {
 }
 
 async function pedidosConKits(
+  supabase: import('@supabase/supabase-js').SupabaseClient,
   filtroEliminado: boolean
 ): Promise<PedidoRow[]> {
   const query = supabase
@@ -97,10 +98,12 @@ async function pedidosConKits(
 }
 
 export default async function PedidosPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const [pedidosActivos, pedidosEliminados] =
     await Promise.all([
-      pedidosConKits(false),
-      pedidosConKits(true)
+      pedidosConKits(supabase, false),
+      pedidosConKits(supabase, true)
     ])
 
   return (

@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../scr/lib/appAuth'
 import { eliminarPedido } from '../../../../scr/lib/descontarInventario'
-import { supabase } from '../../../../scr/lib/supabase'
 
 const EDITABLE_FIELDS = [
   'estatus',
@@ -19,6 +21,10 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 
@@ -64,6 +70,10 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(_req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const resultado = await eliminarPedido(
       supabase,

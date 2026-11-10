@@ -3,13 +3,18 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { supabaseUrl, supabaseAnonKey } from './scr/lib/supabaseConfig'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } })
+  function continuar() {
+    const headers = new Headers(request.headers)
+    headers.set('x-couplekits-destino', `${request.nextUrl.pathname}${request.nextUrl.search}`)
+    return NextResponse.next({ request: { headers } })
+  }
+  let response = continuar()
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) request.cookies.set(name, value)
-        response = NextResponse.next({ request: { headers: request.headers } })
+        response = continuar()
         for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options)
         for (const [key, value] of Object.entries(headers)) response.headers.set(key, value)
       }
@@ -22,5 +27,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/finanzas/:path*', '/dashboard/:path*', '/api/finanzas/:path*', '/api/dashboard/:path*']
+  // Cada página y API comprueba además la sesión y la membresía en el servidor.
+  matcher: ['/', '/acceso', '/pedidos/:path*', '/insumos/:path*', '/locales/:path*', '/finanzas/:path*', '/kits/:path*', '/dashboard/:path*', '/contenido/:path*', '/ventas/:path*', '/api/:path*']
 }

@@ -1,10 +1,16 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../scr/lib/appAuth'
 import {
   registrarEntradaInsumo
 } from '../../../../scr/lib/calcularStock'
 import { agregarInsumoARecetasKits } from '../../../../scr/lib/pedidoSnapshots'
-import { supabase } from '../../../../scr/lib/supabase'
 
 export async function POST(req: Request) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 

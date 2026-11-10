@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../../scr/lib/appAuth'
 import {
   actualizarCompraInsumo,
   calcularCostoPromedioSimple,
@@ -5,12 +8,15 @@ import {
   eliminarCompraInsumo,
   obtenerHistorialCompras
 } from '../../../../../scr/lib/calcularStock'
-import { supabase } from '../../../../../scr/lib/supabase'
 
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
     const cantidad = Number(body.cantidad)
@@ -83,6 +89,10 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const url = new URL(req.url)
     const insumoId = url.searchParams.get('insumoId')

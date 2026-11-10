@@ -5,7 +5,7 @@ import {
   obtenerHistorialCompras,
   obtenerHistorialConsumoPedidos
 } from '../../../scr/lib/calcularStock'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import InsumoDetalle from './InsumoDetalle'
 
 export const dynamic = 'force-dynamic'
@@ -15,6 +15,8 @@ export default async function InsumoPage({
 }: {
   params: { id: string }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const { data: insumo } = await supabase
     .from('insumos')
     .select(

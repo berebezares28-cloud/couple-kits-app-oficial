@@ -1,21 +1,17 @@
-import { getSupabaseAdminOrError } from '../../../../../scr/lib/supabase-admin'
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../../scr/lib/appAuth'
 import { syncPedidoKits } from '../../../../../scr/lib/descontarInventario'
 
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
-    const admin = getSupabaseAdminOrError()
-
-    if ('error' in admin) {
-      return Response.json(
-        { error: admin.error },
-        { status: 500 }
-      )
-    }
-
-    const supabase = admin.client
     const body = await req.json()
 
     if (!Array.isArray(body.kits)) {

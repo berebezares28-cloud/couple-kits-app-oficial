@@ -1,10 +1,16 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../../scr/lib/appAuth'
 import { restaurarPedido } from '../../../../../scr/lib/descontarInventario'
-import { supabase } from '../../../../../scr/lib/supabase'
 
 export async function POST(
   _req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(_req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const resultado = await restaurarPedido(
       supabase,

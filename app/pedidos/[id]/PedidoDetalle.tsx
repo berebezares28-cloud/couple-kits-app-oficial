@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { supabase } from '../../../scr/lib/supabase'
+import { crearSupabaseBrowser } from '../../../scr/lib/supabaseBrowser'
 import {
   obtenerConsumoDesdeKits,
   syncPedidoKits
@@ -120,6 +120,8 @@ export default function PedidoDetalle({
   kitsDisponibles: KitDisponible[]
   puntosEntrega: PuntoEntrega[]
 }) {
+  const supabase = crearSupabaseBrowser()
+
   const entregaInicial = inferirEntregaDesdePedido(
     pedidoInicial,
     puntosEntrega

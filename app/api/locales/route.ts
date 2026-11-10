@@ -1,10 +1,16 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../scr/lib/appAuth'
 import {
   crearPuntoEntrega,
   listarPuntosEntrega
 } from '../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../scr/lib/supabase'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const puntos = await listarPuntosEntrega(supabase)
     return Response.json(puntos)
@@ -18,6 +24,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 

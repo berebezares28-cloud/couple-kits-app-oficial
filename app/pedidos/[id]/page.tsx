@@ -1,5 +1,5 @@
 import { listarPuntosEntrega } from '../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import PedidoDetalle from './PedidoDetalle'
 import { notFound } from 'next/navigation'
 
@@ -12,6 +12,8 @@ export default async function PedidoPage({
     id: string
   }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const { data: pedido } = await supabase
     .from('pedidos')
     .select('*')

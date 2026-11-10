@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseAdmin } from '../../../scr/lib/supabase-admin'
+import { firmaTallyValida } from '../../../scr/lib/tallySeguridad'
 import { insertarPedidoKitsConSnapshot } from '../../../scr/lib/pedidoSnapshots'
 import {
   buscarPuntoEntregaPorLugar,
@@ -6,10 +7,7 @@ import {
 } from '../../../scr/lib/puntosEntrega'
 import { resolverKitsDesdeCamposTally, extraerCandidatosKit } from '../../../scr/lib/resolverKitsTally'
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
 function getField(fields: any[], label: string) {
   return fields.find((f) => f.label === label)
@@ -46,9 +44,21 @@ function getMultiSelectTexts(field: any) {
 }
 
 export async function POST(req: Request) {
+  const secret = process.env.TALLY_SIGNING_SECRET
+  if (!secret) return Response.json({ error: 'Firma de webhook no configurada' }, { status: 503 })
+  let body
+  try { body = await req.json() } catch {
+    return Response.json({ error: 'JSON inválido' }, { status: 400 })
+  }
+  if (!firmaTallyValida(body, req.headers.get('tally-signature'), secret)) {
+    return Response.json({ error: 'Firma inválida' }, { status: 401 })
+  }
+  if (!body?.data || !Array.isArray(body.data.fields) || typeof body.data.submissionId !== 'string' || !body.data.submissionId.trim()) {
+    return Response.json({ error: 'Pedido inválido' }, { status: 400 })
+  }
+  const supabase = createSupabaseAdmin()
+  if (!supabase) return Response.json({ error: 'Conexión no configurada' }, { status: 503 })
   try {
-    const body = await req.json()
-
     const fields = body.data.fields
 
     const submissionId = body.data.submissionId

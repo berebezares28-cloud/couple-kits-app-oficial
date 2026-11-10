@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import IngresosExtra from './IngresosExtra'
-import CerrarSesionFinanzas from '../components/CerrarSesionFinanzas'
 import type { IngresoExtra } from '../../scr/lib/ingresosExtra'
 import {
   CATEGORIAS_GASTO,
@@ -467,7 +466,6 @@ export default function FinanzasClient({
   return (
     <main className="min-h-screen bg-white">
       <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-5 lg:px-8 pb-24 pt-8">
-        <CerrarSesionFinanzas />
 
         <h1
           className="editorial-title"

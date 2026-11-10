@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import { listarInsumosConStock } from '../../../scr/lib/calcularStock'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import CompraClient from './CompraClient'
 
 export default async function CompraPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const [insumos, kitsResult] = await Promise.all([
     listarInsumosConStock(supabase),
     supabase

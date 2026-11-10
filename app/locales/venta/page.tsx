@@ -1,11 +1,13 @@
 import { Suspense } from 'react'
 import { listarPuntosEntrega } from '../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import VentaBulkClient from './VentaBulkClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VentaBulkPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const [puntos, kitsResult] = await Promise.all([
     listarPuntosEntrega(supabase),
     supabase

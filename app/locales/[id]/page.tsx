@@ -8,7 +8,7 @@ import {
   obtenerHistorialPunto,
   obtenerPuntoEntrega
 } from '../../../scr/lib/puntosEntrega'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import LocalDetalle from './LocalDetalle'
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +17,8 @@ export default async function LocalPage({
 }: {
   params: { id: string }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const punto = await obtenerPuntoEntrega(
     supabase,
     params.id

@@ -2,10 +2,12 @@ export const dynamic = 'force-dynamic'
 
 import { obtenerConsolidacionVentas } from '../../scr/lib/consolidacionVentas'
 import { listarKitsConVentas } from '../../scr/lib/kitsData'
-import { supabase } from '../../scr/lib/supabase'
+import { exigirAppPagina } from '../../scr/lib/appAuth'
 import KitsClient from './KitsClient'
 
 export default async function KitsPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const [kits, insumosResult, consolidacion] =
     await Promise.all([
       listarKitsConVentas(supabase),

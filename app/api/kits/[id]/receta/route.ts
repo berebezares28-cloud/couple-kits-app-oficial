@@ -1,10 +1,16 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../../scr/lib/appAuth'
 import { sincronizarRecetaKit } from '../../../../../scr/lib/kitsData'
-import { supabase } from '../../../../../scr/lib/supabase'
 
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 

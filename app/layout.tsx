@@ -4,7 +4,7 @@ import '@fontsource/inter/700.css'
 import '@fontsource/inter/800.css'
 import '@fontsource/inter/900.css'
 import type { Metadata } from 'next'
-import BottomNav from './components/BottomNav'
+import AppShell from './components/AppShell'
 
 export const metadata: Metadata = {
   title: 'Couple Kits',
@@ -19,8 +19,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <div className="lg:pl-60">{children}</div>
-        <BottomNav />
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )

@@ -3,9 +3,11 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { formatearFechaInsumo, formatearMoneda } from '../../scr/lib/insumosUtils'
 import { obtenerResumenVentasMes } from '../../scr/lib/resumenVentasMes'
-import { supabase } from '../../scr/lib/supabase'
+import { exigirAppPagina } from '../../scr/lib/appAuth'
 
 export default async function VentasMesPage() {
+  const { client: supabase } = await exigirAppPagina()
+
   const resumen = await obtenerResumenVentasMes(supabase)
 
   return (

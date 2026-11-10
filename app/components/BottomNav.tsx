@@ -51,7 +51,7 @@ const desktopNavItems = [
   { href: '/contenido', label: 'Contenido', icon: '📱', isActive: (path: string) => path.startsWith('/contenido') }
 ]
 
-export default function BottomNav() {
+export default function BottomNav({ cuenta }: { cuenta?: React.ReactNode }) {
   const pathname = usePathname()
 
   return (
@@ -74,6 +74,7 @@ export default function BottomNav() {
             </Link>
           ))}
         </nav>
+        {cuenta && <div className="border-t border-gray-100 px-4 py-4">{cuenta}</div>}
       </aside>
     <nav aria-label="Navegación móvil"
       className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-black"

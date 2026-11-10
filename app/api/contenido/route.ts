@@ -1,12 +1,18 @@
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../scr/lib/appAuth'
 import {
   crearPublicacionContenido,
   listarPublicacionesContenido,
   type EstadoContenido,
   type FormatoContenido
 } from '../../../scr/lib/contenidoData'
-import { supabase } from '../../../scr/lib/supabase'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const publicaciones =
       await listarPublicacionesContenido(supabase)
@@ -22,6 +28,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
 

@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { listarInsumosConStock } from '../scr/lib/calcularStock'
 import { obtenerResumenVentasMes } from '../scr/lib/resumenVentasMes'
-import { supabase } from '../scr/lib/supabase'
+import { exigirAppPagina } from '../scr/lib/appAuth'
 
 function getStatusStyle(status: string) {
   switch (status) {
@@ -44,7 +44,7 @@ function getStatusStyle(status: string) {
   }
 }
 
-async function obtenerPedidosRecientes() {
+async function obtenerPedidosRecientes(supabase: import('@supabase/supabase-js').SupabaseClient) {
   const { data: pedidos } = await supabase
     .from('pedidos')
     .select('id, nombre, instagram, estatus, fecha_entrega, hora_entrega, lugar_entrega')
@@ -57,12 +57,14 @@ async function obtenerPedidosRecientes() {
 }
 
 export default async function Home() {
+  const { client: supabase } = await exigirAppPagina()
+
   const [pendientes, activos, insumosConStock, ventasMes, recientes] = await Promise.all([
     supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estatus', 'Pendiente').neq('eliminado', true),
     supabase.from('kits').select('*', { count: 'exact', head: true }).eq('activo', true),
     listarInsumosConStock(supabase),
     obtenerResumenVentasMes(supabase),
-    obtenerPedidosRecientes()
+    obtenerPedidosRecientes(supabase)
   ])
   const pedidosPendientes = pendientes.count
   const kitsActivos = activos.count

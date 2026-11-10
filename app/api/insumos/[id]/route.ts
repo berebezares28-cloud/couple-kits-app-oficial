@@ -1,4 +1,6 @@
-import { getSupabaseAdminOrError } from '../../../../scr/lib/supabase-admin'
+export const dynamic = 'force-dynamic'
+
+import { autorizarApp } from '../../../../scr/lib/appAuth'
 
 const EDITABLE_FIELDS = [
   'nombre',
@@ -9,17 +11,11 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
-    const admin = getSupabaseAdminOrError()
-
-    if ('error' in admin) {
-      return Response.json(
-        { error: admin.error },
-        { status: 500 }
-      )
-    }
-
-    const supabase = admin.client
     const body = await req.json()
 
     const update: Record<string, string | number> = {}
@@ -68,17 +64,11 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const acceso = await autorizarApp(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
-    const admin = getSupabaseAdminOrError()
-
-    if ('error' in admin) {
-      return Response.json(
-        { error: admin.error },
-        { status: 500 }
-      )
-    }
-
-    const supabase = admin.client
     const body = await req.json()
     const cantidad = Number(body.cantidad)
 

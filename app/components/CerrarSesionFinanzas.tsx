@@ -14,7 +14,7 @@ export default function CerrarSesionFinanzas() {
     try {
       const { error: errorSalir } = await crearSupabaseBrowser().auth.signOut({ scope: 'local' })
       if (errorSalir) throw errorSalir
-      router.replace('/finanzas/acceso')
+      router.replace('/acceso')
       router.refresh()
     } catch { setError(true); setOcupado(false) }
   }

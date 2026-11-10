@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { obtenerDisponibilidadFiguras, type DisponibilidadFigura } from '../../../scr/lib/disponibilidadFiguras'
-import { supabase } from '../../../scr/lib/supabase'
+import { exigirAppPagina } from '../../../scr/lib/appAuth'
 import { obtenerResumenPedidos, type ResumenLugar } from '../../../scr/lib/resumenPedidos'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +16,8 @@ export default async function ResumenPedidosPage({
 }: {
   searchParams: { fecha?: string | string[] }
 }) {
+  const { client: supabase } = await exigirAppPagina()
+
   const fecha = typeof searchParams.fecha === 'string' ? searchParams.fecha : fechaHoy()
   const fechaValida = /^\d{4}-\d{2}-\d{2}$/.test(fecha) &&
     !Number.isNaN(Date.parse(fecha)) &&
