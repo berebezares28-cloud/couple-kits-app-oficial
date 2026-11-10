@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import CerrarSesionFinanzas from '../components/CerrarSesionFinanzas'
 import { useState } from 'react'
 import type {
   AtajoRangoDashboard,
@@ -192,7 +193,9 @@ export default function DashboardClient({
   return (
     <main className="min-h-screen bg-[#fafafa]">
       <div className="max-w-md mx-auto px-5 pb-24 pt-8">
+        <CerrarSesionFinanzas />
         <Link
+          prefetch={false}
           href="/"
           className="text-sm text-gray-500 hover:text-black"
         >

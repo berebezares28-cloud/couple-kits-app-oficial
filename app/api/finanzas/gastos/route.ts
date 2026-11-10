@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import {
   CATEGORIAS_GASTO,
   crearGasto,
@@ -5,9 +7,13 @@ import {
   listarGastos,
   METODOS_PAGO
 } from '../../../../scr/lib/finanzasData'
-import { supabase } from '../../../../scr/lib/supabase'
+import { autorizarFinanzas } from '../../../../scr/lib/finanzasAuth'
 
 export async function GET(req: Request) {
+  const acceso = await autorizarFinanzas(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const url = new URL(req.url)
     const mes = url.searchParams.get('mes') ?? undefined
@@ -25,6 +31,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const acceso = await autorizarFinanzas(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const body = await req.json()
     const monto = Number(body.monto)
@@ -88,6 +98,10 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const acceso = await autorizarFinanzas(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const url = new URL(req.url)
     const id = url.searchParams.get('id')

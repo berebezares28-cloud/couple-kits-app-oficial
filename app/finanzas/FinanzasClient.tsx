@@ -2,6 +2,9 @@
 
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
+import IngresosExtra from './IngresosExtra'
+import CerrarSesionFinanzas from '../components/CerrarSesionFinanzas'
+import type { IngresoExtra } from '../../scr/lib/ingresosExtra'
 import {
   CATEGORIAS_GASTO,
   ETIQUETAS_CATEGORIA_GASTO,
@@ -22,7 +25,7 @@ import {
 const inputClass =
   'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-black'
 
-type Tab = 'pl' | 'gastos' | 'activos' | 'cuentas'
+type Tab = 'pl' | 'ingresos' | 'gastos' | 'activos' | 'cuentas'
 
 function etiquetaMes(mes: string) {
   const [y, m] = mes.split('-').map(Number)
@@ -229,10 +232,12 @@ function TarjetasFlujoHistorico({
 
 export default function FinanzasClient({
   resumenInicial,
-  gastosIniciales
+  gastosIniciales,
+  ingresosIniciales
 }: {
   resumenInicial: FinanzasResumen
   gastosIniciales: Gasto[]
+  ingresosIniciales: IngresoExtra[]
 }) {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('pl')
@@ -241,6 +246,7 @@ export default function FinanzasClient({
     normalizarFinanzasResumen(resumenInicial)
   )
   const [gastos, setGastos] = useState(gastosIniciales)
+  const [ingresos, setIngresos] = useState(ingresosIniciales)
   const [cargando, setCargando] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState<{
@@ -277,30 +283,28 @@ export default function FinanzasClient({
   const recargar = useCallback(async (nuevoMes: string) => {
     setCargando(true)
     try {
-      const [resFin, resGastos] = await Promise.all([
+      const [resFin, resGastos, resIngresos] = await Promise.all([
         fetch(`/api/finanzas?mes=${nuevoMes}`),
-        fetch(`/api/finanzas/gastos?mes=${nuevoMes}`)
+        fetch(`/api/finanzas/gastos?mes=${nuevoMes}`),
+        fetch(`/api/finanzas/ingresos?mes=${nuevoMes}`)
       ])
 
-      if (resFin.ok) {
-        const data = normalizarFinanzasResumen(
-          await resFin.json()
-        )
-        setResumen(data)
-        setSaldosEdit(
-          data.cuentas.map(
-            (c: (typeof resumen.cuentas)[0]) => ({
-              metodo_pago: c.metodo_pago,
-              saldo_inicial: String(c.saldoInicial)
-            })
-          )
-        )
-      }
-
-      if (resGastos.ok) {
-        const data = await resGastos.json()
-        setGastos(data.gastos)
-      }
+      if (!resFin.ok || !resGastos.ok || !resIngresos.ok) throw new Error('No se pudieron actualizar los datos')
+      const [finanzas, gastosData, ingresosData] = await Promise.all([
+        resFin.json(), resGastos.json(), resIngresos.json()
+      ])
+      const data = normalizarFinanzasResumen(finanzas)
+      setResumen(data)
+      setSaldosEdit(data.cuentas.map((c) => ({
+        metodo_pago: c.metodo_pago,
+        saldo_inicial: String(c.saldoInicial)
+      })))
+      setGastos(gastosData.gastos)
+      setIngresos(ingresosData.ingresos)
+      return true
+    } catch {
+      setMensaje({ tipo: 'error', texto: 'No se pudieron actualizar los datos. Recarga la página para consultar los movimientos.' })
+      return false
     } finally {
       setCargando(false)
     }
@@ -316,8 +320,13 @@ export default function FinanzasClient({
   }, [tab, resumen.flujosPorMes, mes, recargar])
 
   async function cambiarMes(nuevoMes: string) {
-    setMes(nuevoMes)
-    await recargar(nuevoMes)
+    if (await recargar(nuevoMes)) setMes(nuevoMes)
+  }
+
+  async function actualizarTrasIngreso(fecha?: string) {
+    const nuevoMes = fecha?.slice(0, 7) ?? mes
+    if (await recargar(nuevoMes)) setMes(nuevoMes)
+    router.refresh()
   }
 
   function flujoNetoMes(cuentas: CuentaFlujoMes[]) {
@@ -447,6 +456,7 @@ export default function FinanzasClient({
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'pl', label: 'P&L' },
+    { id: 'ingresos', label: 'Ingresos extra' },
     { id: 'gastos', label: 'Gastos' },
     { id: 'activos', label: 'Activos' },
     { id: 'cuentas', label: 'Cuentas' }
@@ -456,7 +466,8 @@ export default function FinanzasClient({
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-md mx-auto px-5 pb-24 pt-8">
+      <div className="max-w-md md:max-w-3xl lg:max-w-5xl mx-auto px-5 lg:px-8 pb-24 pt-8">
+        <CerrarSesionFinanzas />
 
         <h1
           className="editorial-title"
@@ -478,10 +489,11 @@ export default function FinanzasClient({
         </p>
 
         <div className="mb-4">
-          <label className="text-xs text-gray-500 mb-1 block">
+          <label htmlFor="periodo-finanzas" className="text-xs text-gray-500 mb-1 block">
             Periodo
           </label>
           <select
+            id="periodo-finanzas"
             value={mes}
             onChange={(e) =>
               cambiarMes(e.target.value)
@@ -503,7 +515,8 @@ export default function FinanzasClient({
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className="flex-1 min-w-[4.5rem] rounded-full py-2 text-xs font-semibold border whitespace-nowrap"
+              aria-pressed={tab === t.id}
+              className="flex-1 shrink-0 min-w-[4.5rem] rounded-full px-3 py-2 text-xs font-semibold border whitespace-nowrap"
               style={{
                 background:
                   tab === t.id ? '#111' : '#fff',
@@ -553,8 +566,10 @@ export default function FinanzasClient({
             >
               <LineaPL
                 label="Ventas (pedidos + bulk)"
-                valor={pl.ingresos}
+                valor={pl.ingresosVentas ?? pl.ingresos}
               />
+              <LineaPL label="Ingresos extra" valor={pl.ingresosExtra ?? 0} />
+              <LineaPL label="Ingresos totales" valor={pl.ingresos} destacado />
             </SeccionColapsable>
 
             <SeccionColapsable
@@ -650,6 +665,10 @@ export default function FinanzasClient({
               </span>
             </div>
           </div>
+        )}
+
+        {tab === 'ingresos' && (
+          <IngresosExtra ingresos={ingresos} periodo={etiquetaMes(mes)} cargando={cargando} onCambio={actualizarTrasIngreso} />
         )}
 
         {tab === 'gastos' && (

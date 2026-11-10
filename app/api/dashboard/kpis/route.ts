@@ -1,11 +1,17 @@
+export const dynamic = 'force-dynamic'
+
 import {
   obtenerBloqueRango,
   rangoPorDefecto,
   validarRangoFechas
 } from '../../../../scr/lib/dashboardData'
-import { supabase } from '../../../../scr/lib/supabase'
+import { autorizarFinanzas } from '../../../../scr/lib/finanzasAuth'
 
 export async function GET(req: Request) {
+  const acceso = await autorizarFinanzas(req)
+  if (acceso.response) return acceso.response
+  const supabase = acceso.client
+
   try {
     const url = new URL(req.url)
     const desdeParam = url.searchParams.get('desde')

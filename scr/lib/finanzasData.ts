@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { esEntregaEnLocal } from './puntosEntrega'
+import { listarIngresosExtra, type IngresoExtra } from './ingresosExtra'
 import {
   consumoInsumosPorPedido,
   pedidoActivo,
@@ -34,6 +35,8 @@ export type Gasto = {
 export type EstadoPL = {
   mes: string
   ingresos: number
+  ingresosVentas: number
+  ingresosExtra: number
   costoVentas: number
   margenBruto: number
   comisiones: number
@@ -374,6 +377,9 @@ export async function calcularPlRango(
     }
   }
 
+  const ingresosExtra = await listarIngresosExtra(supabase, { desde, hasta })
+  ingresos += ingresosExtra.reduce((total, ingreso) => total + ingreso.monto, 0)
+
   const { data: compras } = await supabase
     .from('compras_insumos')
     .select(
@@ -445,7 +451,8 @@ export async function calcularPlRango(
 function mesesDesdeMovimientos(
   eventos: EventoVenta[],
   gastos: Gasto[],
-  compras: CompraFlujo[]
+  compras: CompraFlujo[],
+  ingresosExtra: IngresoExtra[]
 ): string[] {
   const meses = new Set<string>()
 
@@ -455,6 +462,10 @@ function mesesDesdeMovimientos(
 
   for (const g of gastos) {
     meses.add(g.fecha.slice(0, 7))
+  }
+
+  for (const ingreso of ingresosExtra) {
+    meses.add(ingreso.fecha.slice(0, 7))
   }
 
   for (const c of compras) {
@@ -488,11 +499,17 @@ function calcularFlujosCuenta(
   eventos: EventoVenta[],
   gastos: Gasto[],
   compras: CompraFlujo[],
+  ingresosExtra: IngresoExtra[],
   opciones?: { mes?: string; incluirSaldoInicial?: boolean; saldosMap?: Map<string, number> }
 ): CuentaResumen[] {
   return METODOS_PAGO.map((metodo) => {
     let entradas = 0
     let salidas = 0
+
+    for (const ingreso of ingresosExtra) {
+      if (opciones?.mes && !fechaEnMes(ingreso.fecha, opciones.mes)) continue
+      if (ingreso.metodo_pago === metodo) entradas += ingreso.monto
+    }
 
     for (const e of eventos) {
       if (opciones?.mes && !fechaEnMes(e.fecha, opciones.mes)) {
@@ -570,7 +587,7 @@ export async function obtenerFinanzasResumen(
   supabase: SupabaseClient,
   mes: string
 ): Promise<FinanzasResumen> {
-  const [eventos, gastos, saldosDb, fifo, comprasResult] =
+  const [eventos, gastos, saldosDb, fifo, comprasResult, extras] =
     await Promise.all([
       obtenerEventosVenta(supabase),
       listarGastos(supabase),
@@ -578,13 +595,15 @@ export async function obtenerFinanzasResumen(
       simularFifoGlobal(supabase),
       supabase
         .from('compras_insumos')
-        .select('costo_total, metodo_pago, fecha')
+        .select('costo_total, metodo_pago, fecha'),
+      listarIngresosExtra(supabase)
     ])
 
   const mesesDisponibles = mesesDesdeMovimientos(
     eventos,
     gastos,
-    (comprasResult.data ?? []) as CompraFlujo[]
+    (comprasResult.data ?? []) as CompraFlujo[],
+    extras
   )
 
   const eventosMes = eventos.filter((e) =>
@@ -594,10 +613,13 @@ export async function obtenerFinanzasResumen(
     enMes(g.fecha, mes)
   )
 
-  const ingresos = eventosMes.reduce(
+  const ingresosVentas = eventosMes.reduce(
     (s, e) => s + e.ingreso,
     0
   )
+  const ingresosExtra = extras.filter((i) => enMes(i.fecha, mes))
+    .reduce((total, ingreso) => total + ingreso.monto, 0)
+  const ingresos = ingresosVentas + ingresosExtra
   const comisiones = eventosMes.reduce(
     (s, e) => s + e.comision,
     0
@@ -652,6 +674,7 @@ export async function obtenerFinanzasResumen(
     eventos,
     gastos,
     compras,
+    extras,
     { incluirSaldoInicial: true, saldosMap }
   )
 
@@ -663,6 +686,7 @@ export async function obtenerFinanzasResumen(
           eventos,
           gastos,
           compras,
+          extras,
           { mes: m }
         )
       )
@@ -673,6 +697,8 @@ export async function obtenerFinanzasResumen(
     pl: {
       mes,
       ingresos,
+      ingresosVentas,
+      ingresosExtra,
       costoVentas,
       margenBruto,
       comisiones,
