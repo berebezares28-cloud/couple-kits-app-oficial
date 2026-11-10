@@ -15,10 +15,11 @@ export async function obtenerInsumosLocales(supabase: SupabaseClient, insumoId?:
   return data.map((fila) => {
     const reservado = Number(fila.reservado_locales)
     const vendido = Number(fila.consumido_bulk)
-    if (![reservado, vendido].every((n) => Number.isFinite(n) && n >= 0)) {
+    const total = Number(fila.total_no_disponible)
+    if (![reservado, vendido, total].every((n) => Number.isFinite(n) && n >= 0)) {
       throw new Error('Revisa las cantidades de inventario y recetas de los locales.')
     }
     return { insumo_id: fila.insumo_id, reservado_locales: reservado,
-      consumido_bulk: vendido, total_no_disponible: reservado + vendido }
+      consumido_bulk: vendido, total_no_disponible: total }
   })
 }
