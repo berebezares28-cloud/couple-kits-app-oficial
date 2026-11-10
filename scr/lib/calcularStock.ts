@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { esEntregaEnLocal } from './puntosEntrega'
 import { pedidoActivo } from './pedidoSnapshots'
+import { obtenerInsumosLocales } from './insumosLocales'
 
 export type InsumoConStock = {
   id: string
@@ -180,14 +181,23 @@ export async function calcularStockPorInsumo(
   supabase: SupabaseClient,
   insumoId: string
 ): Promise<number> {
-  const [movimientosResult, comprasResult, consumo] = await Promise.all([
+  return (await obtenerDesgloseStockPorInsumo(supabase, insumoId)).disponible
+}
+
+export async function obtenerDesgloseStockPorInsumo(supabase: SupabaseClient, insumoId: string) {
+  const [movimientosResult, comprasResult, consumo, locales] = await Promise.all([
     supabase.from('movimientos_inventario').select('cantidad').eq('insumo_id', insumoId).eq('tipo_movimiento', 'entrada'),
     supabase.from('compras_insumos').select('cantidad').eq('insumo_id', insumoId),
-    sumarConsumoEntregados(supabase)
+    sumarConsumoEntregados(supabase),
+    obtenerInsumosLocales(supabase, insumoId)
   ])
   const entradas = [...(movimientosResult.data ?? []), ...(comprasResult.data ?? [])]
     .reduce((total, fila) => total + Number(fila.cantidad), 0)
-  return entradas - (consumo.get(insumoId) ?? 0)
+  const entregadosDirectos = consumo.get(insumoId) ?? 0
+  const reservadoLocales = locales.find((fila) => fila.insumo_id === insumoId)?.reservado_locales ?? 0
+  const consumidoBulk = locales.find((fila) => fila.insumo_id === insumoId)?.consumido_bulk ?? 0
+  return { entradas, entregadosDirectos, reservadoLocales, consumidoBulk,
+    disponible: entradas - entregadosDirectos - reservadoLocales - consumidoBulk }
 }
 
 export async function calcularStockTodos(
@@ -195,12 +205,14 @@ export async function calcularStockTodos(
 ): Promise<Map<string, number>> {
   const stock = new Map<string, number>()
 
-  const [insumosResult, entradas, consumo] = await Promise.all([
+  const [insumosResult, entradas, consumo, locales] = await Promise.all([
     supabase.from('insumos').select('id, stock_actual'),
     sumarEntradas(supabase),
-    sumarConsumoEntregados(supabase)
+    sumarConsumoEntregados(supabase),
+    obtenerInsumosLocales(supabase)
   ])
   const insumos = insumosResult.data
+  const noDisponibles = new Map(locales.map((fila) => [fila.insumo_id, fila.total_no_disponible]))
 
   for (const insumo of insumos ?? []) {
     const entradasLedger =
@@ -208,11 +220,9 @@ export async function calcularStockTodos(
     const consumido =
       consumo.get(insumo.id) ?? 0
 
-    let totalEntradas = entradasLedger
-
     stock.set(
       insumo.id,
-      totalEntradas - consumido
+      entradasLedger - consumido - (noDisponibles.get(insumo.id) ?? 0)
     )
   }
 

@@ -477,6 +477,7 @@ export default function LocalDetalle({
                 {totalKitsInventario === 1 ? '' : 's'}{' '}
                 disponibles
               </p>
+              <p className="text-xs text-gray-500 mt-1">Sus insumos están apartados y no están disponibles para otros pedidos.</p>
             </div>
             <button
               type="button"
@@ -502,6 +503,7 @@ export default function LocalDetalle({
 
           {formCargaAbierto && (
             <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-[#fafafa] p-3">
+              <p className="text-xs text-gray-600">Al cargar kits, sus insumos quedan apartados para este local. Su costo se registra cuando se venden en bulk.</p>
               <label className="block">
                 <span className="text-xs text-gray-500">
                   Fecha de carga

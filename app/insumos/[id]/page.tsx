@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import {
   calcularCostoPromedioSimple,
-  calcularStockPorInsumo,
+  obtenerDesgloseStockPorInsumo,
   obtenerHistorialCompras,
   obtenerHistorialConsumoPedidos
 } from '../../../scr/lib/calcularStock'
@@ -29,9 +29,9 @@ export default async function InsumoPage({
     notFound()
   }
 
-  const [stock_actual, compras, consumoPedidos] =
+  const [stock, compras, consumoPedidos] =
     await Promise.all([
-      calcularStockPorInsumo(supabase, insumo.id),
+      obtenerDesgloseStockPorInsumo(supabase, insumo.id),
       obtenerHistorialCompras(supabase, insumo.id),
       obtenerHistorialConsumoPedidos(
         supabase,
@@ -50,7 +50,9 @@ export default async function InsumoPage({
         categoria: insumo.categoria ?? 'otro',
         unidad: insumo.unidad ?? 'pieza',
         stock_minimo: Number(insumo.stock_minimo) || 0,
-        stock_actual,
+        stock_actual: stock.disponible,
+        reservado_locales: stock.reservadoLocales,
+        consumido_bulk: stock.consumidoBulk,
         costo_promedio:
           insumo.costo_promedio != null
             ? Number(insumo.costo_promedio)

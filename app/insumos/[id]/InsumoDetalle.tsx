@@ -15,6 +15,8 @@ type Insumo = {
   categoria: string
   unidad: string
   stock_actual: number
+  reservado_locales: number
+  consumido_bulk: number
   stock_minimo: number
   costo_promedio: number | null
 }
@@ -336,10 +338,10 @@ export default function InsumoDetalle({
               </span>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 items-end">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                  Stock
+                  Disponible para pedidos
                 </p>
                 <p
                   className="text-3xl font-semibold"
@@ -362,6 +364,12 @@ export default function InsumoDetalle({
                   {insumo.stock_minimo ?? 0}
                 </p>
               </div>
+            </div>
+
+            <div className="mt-4 rounded-xl bg-gray-50 px-3 py-3 text-xs text-gray-600 space-y-2">
+              <div className="flex justify-between gap-3"><span>Reservado en kits de locales</span><strong>{insumo.reservado_locales} {insumo.unidad}</strong></div>
+              <div className="flex justify-between gap-3"><span>Consumido en ventas bulk</span><strong>{insumo.consumido_bulk} {insumo.unidad}</strong></div>
+              <p className="text-gray-500">Estas cantidades ya están excluidas de lo disponible. Una venta bulk no las descuenta dos veces.</p>
             </div>
 
             <div className="mt-5 pt-5 border-t">

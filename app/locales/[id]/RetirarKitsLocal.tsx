@@ -80,7 +80,7 @@ export default function RetirarKitsLocal({ puntoId, inventario, onRetiro }: {
       intento.current = null
       setSinConfirmar(false)
       setAbierto(false)
-      setMensaje({ error: false, texto: 'Retiro registrado. Solo se descontaron los kits de este local.' })
+      setMensaje({ error: false, texto: 'Retiro registrado. Los insumos de esos kits vuelven a estar disponibles para pedidos.' })
       router.refresh()
     } catch {
       setSinConfirmar(true)
@@ -99,7 +99,7 @@ export default function RetirarKitsLocal({ puntoId, inventario, onRetiro }: {
     {mensaje && <p role={mensaje.error ? 'alert' : 'status'} className={`mt-2 rounded-lg p-3 text-sm ${mensaje.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}>{mensaje.texto}</p>}
     {abierto && <form onSubmit={retirar} className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
       <h3 className="font-semibold text-sm">Retiro sin venta</h3>
-      <p className="text-xs leading-relaxed text-gray-600">Reduce únicamente el inventario de este local. No registra ingresos, comisiones ni consumo de insumos.</p>
+      <p className="text-xs leading-relaxed text-gray-600">Retira kits del local y libera sus insumos para pedidos. No registra ventas, ingresos ni comisiones.</p>
       <fieldset disabled={guardando || sinConfirmar} className="space-y-3 disabled:opacity-60">
         <label htmlFor="retiro-kit" className="block text-sm font-medium">Kit
           <select id="retiro-kit" required value={kitId} onChange={(e) => setKitId(e.target.value)} className={inputClass}>
@@ -115,7 +115,7 @@ export default function RetirarKitsLocal({ puntoId, inventario, onRetiro }: {
           </label>
         </div>
         <label htmlFor="retiro-motivo" className="block text-sm font-medium">Motivo del retiro
-          <textarea id="retiro-motivo" required maxLength={1000} rows={2} placeholder="Ej. Regreso al taller, muestra o kit dañado" value={motivo} onChange={(e) => setMotivo(e.target.value)} className={inputClass} />
+          <textarea id="retiro-motivo" required maxLength={1000} rows={2} placeholder="Ej. Regreso al taller para entregar pedidos" value={motivo} onChange={(e) => setMotivo(e.target.value)} className={inputClass} />
         </label>
       </fieldset>
       <button type="submit" disabled={guardando} className="w-full rounded-lg bg-[#c6302c] px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50">

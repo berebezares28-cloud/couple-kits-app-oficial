@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { obtenerInsumosLocales, type InsumosLocales } from './insumosLocales'
 
 export type DisponibilidadFigura = {
   id: string
@@ -18,10 +19,12 @@ type Entrada = { insumo_id: string; cantidad: number }
 type DatosFiguras = {
   pedidos: Pedido[]; lineas: Linea[]; recetas: Receta[]; snapshots: Snapshot[]
   figuras: Figura[]; compras: Entrada[]; entradas: Entrada[]
+  locales: InsumosLocales[]
 }
 
 // Mismo inventario que Insumos: compras + entradas, menos consumo histórico
-// de pedidos entregados directamente. No reserva ni modifica existencias.
+// de pedidos entregados directamente, kits en locales y ventas bulk.
+// Es una consulta; no modifica existencias.
 export function calcularDisponibilidadFiguras(datos: DatosFiguras) {
   const figuras = new Map(datos.figuras.map((f) => [f.id, f]))
   const stock = new Map<string, number>()
@@ -43,6 +46,9 @@ export function calcularDisponibilidadFiguras(datos: DatosFiguras) {
   }
   for (const e of [...datos.compras, ...datos.entradas]) {
     stock.set(e.insumo_id, (stock.get(e.insumo_id) ?? 0) + Number(e.cantidad))
+  }
+  for (const local of datos.locales) {
+    stock.set(local.insumo_id, (stock.get(local.insumo_id) ?? 0) - local.total_no_disponible)
   }
   for (const linea of datos.lineas) {
     const pedido = pedidos.get(linea.pedido_id)
@@ -94,14 +100,15 @@ async function leerTodo<T>(consultar: (desde: number, hasta: number) => PromiseL
 
 export async function obtenerDisponibilidadFiguras(supabase: SupabaseClient) {
   // Ninguna consulta depende del filtro de fecha del resumen.
-  const [pedidos, lineas, recetas, snapshots, figuras, compras, entradas] = await Promise.all([
+  const [pedidos, lineas, recetas, snapshots, figuras, compras, entradas, locales] = await Promise.all([
     leerTodo<Pedido>((a,b) => supabase.from('pedidos').select('id, estatus, eliminado, punto_entrega_id').order('id').range(a,b)),
     leerTodo<Linea>((a,b) => supabase.from('pedido_kits').select('id, pedido_id, kit_id, cantidad').order('id').range(a,b)),
     leerTodo<Receta>((a,b) => supabase.from('recetas_kit').select('kit_id, insumo_id, cantidad').order('id').range(a,b)),
     leerTodo<Snapshot>((a,b) => supabase.from('pedido_kit_receta').select('pedido_kit_id, insumo_id, cantidad').order('id').range(a,b)),
     leerTodo<Figura>((a,b) => supabase.from('insumos').select('id, nombre').eq('categoria', 'figura').order('id').range(a,b)),
     leerTodo<Entrada>((a,b) => supabase.from('compras_insumos').select('insumo_id, cantidad').order('id').range(a,b)),
-    leerTodo<Entrada>((a,b) => supabase.from('movimientos_inventario').select('insumo_id, cantidad').eq('tipo_movimiento', 'entrada').order('id').range(a,b))
+    leerTodo<Entrada>((a,b) => supabase.from('movimientos_inventario').select('insumo_id, cantidad').eq('tipo_movimiento', 'entrada').order('id').range(a,b)),
+    obtenerInsumosLocales(supabase)
   ])
-  return calcularDisponibilidadFiguras({ pedidos, lineas, recetas, snapshots, figuras, compras, entradas })
+  return calcularDisponibilidadFiguras({ pedidos, lineas, recetas, snapshots, figuras, compras, entradas, locales })
 }
