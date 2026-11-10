@@ -1,0 +1,17 @@
+CREATE ROLE authenticated;
+CREATE ROLE anon;
+CREATE SCHEMA auth;
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+GRANT USAGE ON SCHEMA auth TO authenticated, anon;
+CREATE TABLE public.finanzas_accesos(user_id uuid PRIMARY KEY);
+INSERT INTO public.finanzas_accesos VALUES ('00000000-0000-4000-8000-000000000001');
+CREATE TABLE public.puntos_entrega(id uuid PRIMARY KEY);
+CREATE TABLE public.kits(id uuid PRIMARY KEY);
+CREATE TABLE public.ventas_local(id uuid PRIMARY KEY, ingreso_total numeric);
+CREATE TABLE public.insumos(id uuid PRIMARY KEY, stock_actual numeric);
+CREATE TABLE public.compras_insumos(id uuid PRIMARY KEY, cantidad numeric);
+CREATE TABLE public.ventas_local_kits(id uuid PRIMARY KEY, cantidad numeric);
+INSERT INTO public.puntos_entrega VALUES ('10000000-0000-4000-8000-000000000001'), ('10000000-0000-4000-8000-000000000002');
+INSERT INTO public.kits VALUES ('20000000-0000-4000-8000-000000000001'), ('20000000-0000-4000-8000-000000000002');
+INSERT INTO public.insumos VALUES ('30000000-0000-4000-8000-000000000001',100);
+INSERT INTO public.ventas_local VALUES ('40000000-0000-4000-8000-000000000001',500);

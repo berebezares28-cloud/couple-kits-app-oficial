@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import RetirarKitsLocal from './RetirarKitsLocal'
 import {
   formatearFechaInsumo,
   formatearMoneda
@@ -494,6 +495,11 @@ export default function LocalDetalle({
             </button>
           </div>
 
+          <RetirarKitsLocal puntoId={punto.id} inventario={inventario} onRetiro={(kitId, restante, movimiento) => {
+            setInventario((actual) => actual.map((item) => item.kit_id === kitId ? { ...item, cantidad: restante } : item).filter((item) => item.cantidad > 0))
+            setMovimientos((actual) => [movimiento, ...actual.filter((item) => item.id !== movimiento.id)].slice(0, 15))
+          }} />
+
           {formCargaAbierto && (
             <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-[#fafafa] p-3">
               <label className="block">
@@ -623,8 +629,9 @@ export default function LocalDetalle({
                 {movimientos.slice(0, 6).map((mov) => (
                   <li
                     key={mov.id}
-                    className="flex justify-between gap-2 text-xs text-gray-500"
+                    className="text-xs text-gray-500"
                   >
+                    <div className="flex justify-between gap-2">
                     <span>
                       {formatearFechaInsumo(mov.fecha)} ·{' '}
                       {mov.tipo === 'entrada' ? '+' : '−'}
@@ -633,8 +640,10 @@ export default function LocalDetalle({
                     <span className="shrink-0">
                       {mov.tipo === 'entrada'
                         ? 'Carga'
-                        : 'Venta'}
+                        : mov.motivo === 'Retiro sin venta' ? 'Retiro sin venta' : 'Venta'}
                     </span>
+                    </div>
+                    {mov.motivo === 'Retiro sin venta' && mov.notas && <p className="mt-1 break-words text-gray-500">Motivo: {mov.notas}</p>}
                   </li>
                 ))}
               </ul>
