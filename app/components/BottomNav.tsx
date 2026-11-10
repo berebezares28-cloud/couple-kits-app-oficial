@@ -57,7 +57,7 @@ export default function BottomNav() {
   return (
     <>
       <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-60 flex-col border-r-2 border-black bg-white">
-        <Link href="/" className="flex items-center gap-3 px-5 py-7">
+        <Link prefetch={false} href="/" className="flex items-center gap-3 px-5 py-7">
           <Image src="/images/logo.png" alt="" width={42} height={42} />
           <div>
             <span className="block text-xl font-black tracking-tight text-[#c6302c]">Couple Kits</span>
@@ -66,7 +66,7 @@ export default function BottomNav() {
         </Link>
         <nav aria-label="Navegación de escritorio" className="flex-1 overflow-y-auto px-3 pb-6 space-y-1">
           {desktopNavItems.map((item) => (
-            <Link key={item.href} href={item.href}
+            <Link prefetch={false} key={item.href} href={item.href}
               aria-current={item.isActive(pathname) ? 'page' : undefined}
               className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${item.isActive(pathname) ? 'bg-[#c6302c] text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-black'}`}>
               <span aria-hidden="true" className="text-lg">{item.icon}</span>
@@ -87,6 +87,7 @@ export default function BottomNav() {
 
           return (
             <Link
+              prefetch={false}
               key={item.href}
               href={item.href}
               className="flex-1 flex flex-col items-center justify-center py-3 gap-0.5 transition"

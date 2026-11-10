@@ -290,7 +290,7 @@ export default function PedidosClient({
     try {
       const { data: lista, error } = await supabase
         .from('pedidos')
-        .select('*')
+        .select('id, nombre, instagram, lugar_entrega, fecha_entrega, hora_entrega, estatus, nota, eliminado_at')
         .neq('eliminado', true)
         .order('created_at', { ascending: false })
 
@@ -306,7 +306,7 @@ export default function PedidosClient({
     try {
       const { data: lista, error } = await supabase
         .from('pedidos')
-        .select('*')
+        .select('id, nombre, instagram, lugar_entrega, fecha_entrega, hora_entrega, estatus, nota, eliminado_at')
         .eq('eliminado', true)
         .order('created_at', { ascending: false })
 
@@ -924,6 +924,7 @@ export default function PedidosClient({
                   <div>
                     <p className="customer-name">
                       <Link
+                        prefetch={false}
                         href={`/pedidos/${pedido.id}`}
                         className="after:absolute after:inset-0 after:rounded-[inherit]"
                       >
@@ -983,7 +984,7 @@ export default function PedidosClient({
               {pedidosFiltrados.map((pedido) => (
                 <tr key={pedido.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 max-w-[220px]">
-                    <Link className="font-bold hover:underline" href={`/pedidos/${pedido.id}`}>{pedido.nombre}</Link>
+                    <Link prefetch={false} className="font-bold hover:underline" href={`/pedidos/${pedido.id}`}>{pedido.nombre}</Link>
                     <p className="text-xs text-gray-500 mt-1">@{pedido.instagram}</p>
                   </td>
                   <td className="px-4 py-4 max-w-[220px] text-[#c6302c] font-medium">{pedido.kits.join(', ') || 'Sin kits'}</td>
@@ -993,7 +994,7 @@ export default function PedidosClient({
                   </td>
                   <td className="px-4 py-4 max-w-[180px]">{pedido.lugar_entrega || 'Sin lugar'}</td>
                   <td className="px-4 py-4"><SelectorEstatus pedido={pedido} onChange={actualizarEstatus} /></td>
-                  <td className="px-4 py-4"><Link className="font-semibold text-[#c6302c] hover:underline" href={`/pedidos/${pedido.id}`} aria-label={`Ver pedido de ${pedido.nombre}`}>Ver →</Link></td>
+                  <td className="px-4 py-4"><Link prefetch={false} className="font-semibold text-[#c6302c] hover:underline" href={`/pedidos/${pedido.id}`} aria-label={`Ver pedido de ${pedido.nombre}`}>Ver →</Link></td>
                 </tr>
               ))}
               {pedidosFiltrados.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-500">No hay pedidos que coincidan con estos filtros.</td></tr>}

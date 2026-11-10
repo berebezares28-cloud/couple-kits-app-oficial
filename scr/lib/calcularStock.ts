@@ -1,9 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { esEntregaEnLocal } from './puntosEntrega'
-import {
-  consumoInsumosPorPedido,
-  pedidoActivo
-} from './pedidoSnapshots'
+import { pedidoActivo } from './pedidoSnapshots'
 
 export type InsumoConStock = {
   id: string
@@ -90,10 +87,12 @@ async function sumarEntradas(
 ): Promise<Map<string, number>> {
   const entradas = new Map<string, number>()
 
-  const { data: movimientos } = await supabase
-    .from('movimientos_inventario')
-    .select('insumo_id, cantidad')
-    .eq('tipo_movimiento', 'entrada')
+  const [movimientosResult, comprasResult] = await Promise.all([
+    supabase.from('movimientos_inventario').select('insumo_id, cantidad').eq('tipo_movimiento', 'entrada'),
+    supabase.from('compras_insumos').select('insumo_id, cantidad')
+  ])
+  const movimientos = movimientosResult.data
+  const { data: compras, error } = comprasResult
 
   for (const mov of movimientos ?? []) {
     if (!mov.insumo_id) continue
@@ -106,11 +105,6 @@ async function sumarEntradas(
       actual + Number(mov.cantidad)
     )
   }
-
-  const { data: compras, error } =
-    await supabase
-      .from('compras_insumos')
-      .select('insumo_id, cantidad')
 
   if (!error) {
     for (const compra of compras ?? []) {
@@ -149,19 +143,33 @@ async function sumarConsumoEntregados(
     return consumo
   }
 
-  for (const pedido of pedidosDirectos) {
-    const consumoPedido = await consumoInsumosPorPedido(
-      supabase,
-      pedido.id
-    )
-
-    for (const [insumoId, cantidad] of Array.from(
-      consumoPedido.entries()
-    )) {
-      consumo.set(
-        insumoId,
-        (consumo.get(insumoId) ?? 0) + cantidad
-      )
+  const pedidoIds = pedidosDirectos.map((p) => p.id)
+  // Leer por lotes evita volver a pedir líneas, recetas y nombres por cada pedido.
+  for (let inicio = 0; inicio < pedidoIds.length; inicio += 100) {
+    const lineas: { id: string; cantidad: number }[] = []
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await supabase
+        .from('pedido_kits').select('id, cantidad')
+        .in('pedido_id', pedidoIds.slice(inicio, inicio + 100)).order('id').range(desde, desde + 999)
+      if (error) throw new Error('No se pudo calcular el consumo de inventario.')
+      lineas.push(...(data ?? []))
+      if (!data || data.length < 1000) break
+    }
+    if (!lineas.length) continue
+    const cantidades = new Map(lineas.map((l) => [l.id, Number(l.cantidad) || 1]))
+    const ids = lineas.map((l) => l.id)
+    for (let j = 0; j < ids.length; j += 100) {
+      for (let desde = 0; ; desde += 1000) {
+        const { data: recetas, error: errorRecetas } = await supabase
+          .from('pedido_kit_receta').select('pedido_kit_id, insumo_id, cantidad')
+          .in('pedido_kit_id', ids.slice(j, j + 100)).order('id').range(desde, desde + 999)
+        if (errorRecetas) throw new Error('No se pudieron leer las recetas del inventario.')
+        for (const r of recetas ?? []) {
+          const cantidad = Number(r.cantidad) * (cantidades.get(r.pedido_kit_id) ?? 1)
+          consumo.set(r.insumo_id, (consumo.get(r.insumo_id) ?? 0) + cantidad)
+        }
+        if (!recetas || recetas.length < 1000) break
+      }
     }
   }
 
@@ -172,54 +180,14 @@ export async function calcularStockPorInsumo(
   supabase: SupabaseClient,
   insumoId: string
 ): Promise<number> {
-  let entradas = 0
-
-  const { data: movimientos } = await supabase
-    .from('movimientos_inventario')
-    .select('cantidad')
-    .eq('insumo_id', insumoId)
-    .eq('tipo_movimiento', 'entrada')
-
-  for (const mov of movimientos ?? []) {
-    entradas += Number(mov.cantidad)
-  }
-
-  const { data: compras } = await supabase
-    .from('compras_insumos')
-    .select('cantidad')
-    .eq('insumo_id', insumoId)
-
-  for (const compra of compras ?? []) {
-    entradas += Number(compra.cantidad)
-  }
-
-  const { data: pedidos } = await supabase
-    .from('pedidos')
-    .select('id, punto_entrega_id, eliminado')
-    .eq('estatus', 'Entregado')
-    .neq('eliminado', true)
-
-  const pedidosDirectos =
-    pedidos?.filter(
-      (p) => !esEntregaEnLocal(p) && pedidoActivo(p)
-    ) ?? []
-
-  if (!pedidosDirectos.length) {
-    return entradas
-  }
-
-  let consumido = 0
-
-  for (const pedido of pedidosDirectos) {
-    const consumoPedido = await consumoInsumosPorPedido(
-      supabase,
-      pedido.id
-    )
-
-    consumido += consumoPedido.get(insumoId) ?? 0
-  }
-
-  return entradas - consumido
+  const [movimientosResult, comprasResult, consumo] = await Promise.all([
+    supabase.from('movimientos_inventario').select('cantidad').eq('insumo_id', insumoId).eq('tipo_movimiento', 'entrada'),
+    supabase.from('compras_insumos').select('cantidad').eq('insumo_id', insumoId),
+    sumarConsumoEntregados(supabase)
+  ])
+  const entradas = [...(movimientosResult.data ?? []), ...(comprasResult.data ?? [])]
+    .reduce((total, fila) => total + Number(fila.cantidad), 0)
+  return entradas - (consumo.get(insumoId) ?? 0)
 }
 
 export async function calcularStockTodos(
@@ -227,17 +195,12 @@ export async function calcularStockTodos(
 ): Promise<Map<string, number>> {
   const stock = new Map<string, number>()
 
-  const { data: insumos } = await supabase
-    .from('insumos')
-    .select('id, stock_actual')
-
-  for (const insumo of insumos ?? []) {
-    stock.set(insumo.id, 0)
-  }
-
-  const entradas = await sumarEntradas(supabase)
-  const consumo =
-    await sumarConsumoEntregados(supabase)
+  const [insumosResult, entradas, consumo] = await Promise.all([
+    supabase.from('insumos').select('id, stock_actual'),
+    sumarEntradas(supabase),
+    sumarConsumoEntregados(supabase)
+  ])
+  const insumos = insumosResult.data
 
   for (const insumo of insumos ?? []) {
     const entradasLedger =

@@ -23,7 +23,7 @@ async function pedidosConKits(
 ): Promise<PedidoRow[]> {
   const query = supabase
     .from('pedidos')
-    .select('*')
+    .select('id, nombre, instagram, lugar_entrega, fecha_entrega, hora_entrega, estatus, nota, eliminado_at')
     .order('created_at', { ascending: false })
 
   const { data: pedidos } = filtroEliminado

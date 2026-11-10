@@ -44,48 +44,30 @@ function getStatusStyle(status: string) {
   }
 }
 
-export default async function Home() {
-  const { count: pedidosPendientes } = await supabase
-    .from('pedidos')
-    .select('*', { count: 'exact', head: true })
-    .eq('estatus', 'Pendiente')
-    .neq('eliminado', true)
-
-  const { count: kitsActivos } = await supabase
-    .from('kits')
-    .select('*', { count: 'exact', head: true })
-    .eq('activo', true)
-
-  const [insumosConStock, ventasMes] = await Promise.all([
-    listarInsumosConStock(supabase),
-    obtenerResumenVentasMes(supabase)
-  ])
-
-  const insumosCriticos = insumosConStock.filter(
-    (i) =>
-      Number(i.stock_actual) <=
-      Number(i.stock_minimo)
-  ).length
-
+async function obtenerPedidosRecientes() {
   const { data: pedidos } = await supabase
     .from('pedidos')
-    .select('*')
-    .neq('eliminado', true)
-    .order('created_at', { ascending: false })
-    .limit(20)
+    .select('id, nombre, instagram, estatus, fecha_entrega, hora_entrega, lugar_entrega')
+    .neq('eliminado', true).order('created_at', { ascending: false }).limit(20)
+  const ids = pedidos?.map((p) => p.id) ?? []
+  const { data: pedidoKits } = ids.length
+    ? await supabase.from('pedido_kits').select('pedido_id, kits ( nombre )').in('pedido_id', ids)
+    : { data: [] }
+  return { pedidos, pedidoKits }
+}
 
-  const pedidoIds =
-    pedidos?.map((p) => p.id) ?? []
-
-  const { data: pedidoKits } = await supabase
-    .from('pedido_kits')
-    .select(`
-      pedido_id,
-      kits (
-        nombre
-      )
-    `)
-    .in('pedido_id', pedidoIds)
+export default async function Home() {
+  const [pendientes, activos, insumosConStock, ventasMes, recientes] = await Promise.all([
+    supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estatus', 'Pendiente').neq('eliminado', true),
+    supabase.from('kits').select('*', { count: 'exact', head: true }).eq('activo', true),
+    listarInsumosConStock(supabase),
+    obtenerResumenVentasMes(supabase),
+    obtenerPedidosRecientes()
+  ])
+  const pedidosPendientes = pendientes.count
+  const kitsActivos = activos.count
+  const { pedidos, pedidoKits } = recientes
+  const insumosCriticos = insumosConStock.filter((i) => Number(i.stock_actual) <= Number(i.stock_minimo)).length
 
   return (
     <main className="min-h-screen bg-white">
@@ -140,6 +122,7 @@ export default async function Home() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
 
           <Link
+            prefetch={false}
             href="/pedidos?estatus=Pendiente"
             className="editorial-card block hover:-translate-y-[1px] transition"
           >
@@ -156,6 +139,7 @@ export default async function Home() {
           </Link>
 
           <Link
+            prefetch={false}
             href="/kits"
             className="editorial-card block hover:-translate-y-[1px] transition"
           >
@@ -169,6 +153,7 @@ export default async function Home() {
           </Link>
 
           <Link
+            prefetch={false}
             href="/insumos/criticos"
             className="editorial-card block hover:-translate-y-[1px] transition"
           >
@@ -182,6 +167,7 @@ export default async function Home() {
           </Link>
 
           <Link
+            prefetch={false}
             href="/ventas"
             className="editorial-card block hover:-translate-y-[1px] transition"
           >
@@ -201,6 +187,7 @@ export default async function Home() {
 
         <div className="mt-8 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-5">
           <Link
+            prefetch={false}
             href="/pedidos/resumen"
             className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
           >
@@ -214,6 +201,7 @@ export default async function Home() {
           </Link>
 
           <Link
+            prefetch={false}
             href="/dashboard"
             className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
           >
@@ -227,6 +215,7 @@ export default async function Home() {
           </Link>
 
           <Link
+            prefetch={false}
             href="/contenido"
             className="flex items-center justify-between editorial-card hover:-translate-y-[1px] transition px-5 py-4"
           >
@@ -281,6 +270,7 @@ export default async function Home() {
 
               return (
                 <Link
+            prefetch={false}
                   key={pedido.id}
                   href={`/pedidos/${pedido.id}`}
                   className="editorial-card mb-4 md:mb-0 block hover:-translate-y-[1px] transition"
